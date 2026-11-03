@@ -21,11 +21,14 @@ Python stdlib only; the DevTools client is the one in scripts/wasm_smoke.py.
 
 --width and --height set the viewport through Emulation.setDeviceMetricsOverride
 before the page loads (default 1440 by 900); --mobile also emulates a phone, so
-the test runs at 375 px with --width 375 --height 812 --mobile.
+the test runs at 375 px with --width 375 --height 812 --mobile. --reduced-motion
+emulates prefers-reduced-motion: reduce through Emulation.setEmulatedMedia, so
+the process tour checks run on its still, step-by-step form.
 
 Usage:
   python scripts/selftest.py --site _site [--chrome PATH] [--no-sandbox]
       [--expect-commit SHA] [--timeout 90] [--width 1440 --height 900] [--mobile]
+      [--reduced-motion]
 Exit 0 on pass, 1 on any failure, Chrome missing included.
 """
 import argparse
@@ -191,6 +194,9 @@ def run(args):
             s.call("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})
             s.call("Emulation.setDeviceMetricsOverride", {"width": args.width, "height": args.height,
                                                           "deviceScaleFactor": 1, "mobile": args.mobile})
+            if args.reduced_motion:
+                s.call("Emulation.setEmulatedMedia",
+                       {"features": [{"name": "prefers-reduced-motion", "value": "reduce"}]})
             t0 = time.time()
             s.call("Page.navigate", {"url": f"{origin}/index.html?selftest=1"})
             # Resume the engine worker as soon as it attaches, so the wait does not
@@ -229,7 +235,8 @@ def run(args):
         return 1
 
     print(f"site commit {build.get('commit')}, run {build.get('run_id')}, viewport {args.width}x{args.height}"
-          f"{' mobile' if args.mobile else ''}, verdict {verdict['verdict']} after {elapsed:.1f} s, "
+          f"{' mobile' if args.mobile else ''}{' reduced motion' if args.reduced_motion else ''}, "
+          f"verdict {verdict['verdict']} after {elapsed:.1f} s, "
           f"page time {verdict.get('ms')} ms")
     first, wait = verdict.get("first_solve_ms"), verdict.get("first_result_ms")
     if first is not None:
@@ -282,6 +289,8 @@ def main(argv=None):
     ap.add_argument("--width", type=int, default=1440, help="viewport width in CSS px")
     ap.add_argument("--height", type=int, default=900, help="viewport height in CSS px")
     ap.add_argument("--mobile", action="store_true", help="emulate a phone viewport")
+    ap.add_argument("--reduced-motion", action="store_true",
+                    help="emulate prefers-reduced-motion: reduce, so the tour checks run on still steps")
     return run(ap.parse_args(argv))
 
 

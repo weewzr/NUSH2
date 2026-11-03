@@ -444,6 +444,8 @@ async function tail(checks, base, ref) {
     await sleep(ROUTE_WAIT_MS);
   }
 
+  await tourChecks(add);
+
   const units = base && base.units ? base.units : null;
   const unitEls = Array.from(document.querySelectorAll("[data-unit]"));
   if (!unitEls.length) {
@@ -500,6 +502,254 @@ async function tail(checks, base, ref) {
   const page = document.documentElement.dataset.selftest;
   add("no_console_error", errors.length === 0 && page === "pass",
     `${errors.length} error(s) caught by this test, page shell verdict ${page || "none"}${errors.length ? `: ${errors.slice(0, 5).join(" | ")}` : ""}`);
+}
+
+// ------------------------------------------------------------ process tour
+
+// Animations the browser is running now, and those on the tour's own elements.
+const running = () => document.getAnimations().filter((a) => a.playState === "running");
+const tourRunning = () => running().filter((a) => {
+  const t = a.effect && a.effect.target;
+  return Boolean(t && t.closest && t.closest("#pfd-svg, #tour-card, #tour-bar"));
+});
+
+/** A reply value by the data-bind path convention, resolved here apart from the page code. */
+function resolvePath(res, path) {
+  let v = res;
+  for (const k of path.split(".")) {
+    if (Array.isArray(v) && !/^\d+$/.test(k)) v = v.find((e) => e && e.id === k);
+    else v = v && typeof v === "object" ? v[k] : undefined;
+  }
+  return v && typeof v === "object" && "value" in v ? v.value : v;
+}
+
+/** The text a value must print as: fixed decimals, a fraction as a percentage, n/a for no number. */
+function shownAs(v, unit, d) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "n/a";
+  return (unit === "-" ? v * 100 : v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+/** Every number in the caption card against its reply field or results row. */
+function captionNumbers(rows) {
+  const out = { count: 0, bad: [] };
+  for (const b of document.querySelectorAll("#tour-card .tn")) {
+    out.count += 1;
+    const v = b.dataset.path ? resolvePath(state.lastOk, b.dataset.path) : (rows[b.dataset.row] || {}).value;
+    const want = shownAs(v, b.dataset.u, Number(b.dataset.d));
+    if (b.textContent !== want) out.bad.push(`${b.dataset.path || b.dataset.row} shows ${b.textContent}, source ${want}`);
+  }
+  return out;
+}
+
+const press = (key) => (document.activeElement || document.body)
+  .dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+
+// The guided tour of the PFD page: its steps name real units, streams and
+// reply fields; it starts from its button, visits every step and exits with no
+// error; each caption number equals its source; the keys work; reduced motion
+// runs no animation and does not advance; the numbers follow the controls.
+async function tourChecks(add) {
+  location.hash = "#pfd";
+  await sleep(ROUTE_WAIT_MS);
+  let tour;
+  let rows = {};
+  try {
+    tour = await import("./tour.js?v=__COMMIT__");
+    rows = ((await (ok(await fetch("data/tour_rows.json?v=__COMMIT__", NO_STORE))).json()).rows) || {};
+  } catch (e) {
+    add("tour_steps_bound", false, `the tour did not load: ${e && e.message ? e.message : e}`);
+    return;
+  }
+  await pageSolve(null, true);
+  const ready = await until(() => tour.tourState().ready, LOAD_MS);
+  const a = tour.tourAudit(state.lastOk);
+  const unbound = [...a.missing_units, ...a.missing_streams, ...a.missing_marks, ...a.bad_paths, ...a.missing_rows, ...a.bad_keys];
+  add("tour_steps_bound", Boolean(ready) && a.steps > 0 && unbound.length === 0,
+    `${a.steps} steps; every unit, stream, label key, reply path and results row they name resolves${unbound.length ? `; unbound: ${unbound.join(", ")}` : ""}`);
+
+  const n = a.steps;
+  const reducedOS = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const start = document.getElementById("tour-start");
+  const bar = document.getElementById("tour-bar");
+  const title = document.getElementById("tour-title");
+  const act = (name) => bar.querySelector(`[data-act="${name}"]`);
+
+  // Start from the button, step through with Next, leave with Exit.
+  const texts = [];
+  try {
+    const errs0 = errors.length;
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    const st0 = tour.tourState();
+    const focusTitle = document.activeElement === title;
+    const visited = [];
+    const numBad = [];
+    const motion = [];
+    const unlit = [];
+    let numCount = 0;
+    for (let i = 0; i < n; i += 1) {
+      await sleep(150);
+      const st = tour.tourState();
+      visited.push(st.step + 1);
+      texts.push(document.getElementById("tour-card").textContent);
+      const nums = captionNumbers(rows);
+      numCount += nums.count;
+      numBad.push(...nums.bad.map((x) => `step ${st.step + 1}: ${x}`));
+      if (!document.querySelector("#pfd-svg .tour-on")) unlit.push(st.step + 1);
+      const dashes = tourRunning().filter((x) => x.effect.target.classList && x.effect.target.classList.contains("tour-flow")).length;
+      if (!reducedOS && st.flows > 0 && dashes === 0) motion.push(`step ${st.step + 1}: no moving dashes`);
+      if (reducedOS && tourRunning().length) motion.push(`step ${st.step + 1}: animation under reduced motion`);
+      if (i < n - 1) act("next").click();
+    }
+    const last = tour.tourState();
+    const endDisabled = act("next").getAttribute("aria-disabled") === "true";
+    act("exit").click();
+    await sleep(100);
+    const left = !tour.tourState().active && document.activeElement === start
+      && !document.querySelector("#pfd-svg .tour-on, #pfd-svg .tour-flow") && document.getElementById("tour-card").hidden;
+    const newErrors = errors.slice(errs0);
+    const inOrder = visited.length === n && visited.every((v, k) => v === k + 1);
+    const fails = [
+      st0.active ? "" : "did not start",
+      focusTitle ? "" : "focus did not move to the step title",
+      st0.playing === !reducedOS ? "" : `playing ${st0.playing} with reduced motion ${reducedOS}`,
+      inOrder ? "" : `visited ${visited.join(" ")}`,
+      last.step === n - 1 && endDisabled ? "" : "the last step does not end the walk",
+      unlit.length ? `nothing lit on steps ${unlit.join(", ")}` : "",
+      ...motion,
+      left ? "" : "Exit did not close the tour and return focus to the start button",
+      newErrors.length ? `${newErrors.length} error(s): ${newErrors.slice(0, 3).join(" | ")}` : "",
+    ].filter(Boolean);
+    add("tour_plays", fails.length === 0,
+      `started from its button, ${visited.length} of ${n} steps visited in order, ${reducedOS ? "reduced motion" : "dashes moving on every step with flows"}, exited with focus on the start button${fails.length ? `; ${fails.join("; ")}` : ""}`);
+    add("tour_numbers_live", numCount > 0 && numBad.length === 0,
+      `${numCount} caption numbers over ${n} steps at the default inputs, each equal to its reply field or results row${numBad.length ? `; ${numBad.length} differ: ${numBad.slice(0, 6).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_plays", false, String(e && e.message ? e.message : e));
+  }
+
+  // The prose of every step against the visible text rules, with no
+  // placeholder left and no bare SMR.
+  const all = texts.join(" ");
+  const hits = TEXT_RULES.filter(([, b64, flags]) => new RegExp(atob(b64), flags).test(all)).map(([label]) => label);
+  if (all.includes(String.fromCharCode(0x2014))) hits.push("emdash");
+  if (/\bSMR\b/.test(all)) hits.push("bare SMR");
+  if (/\{\w*\}/.test(all)) hits.push("placeholder");
+  add("tour_text_rules", texts.length === n && hits.length === 0,
+    `${all.length} characters over ${texts.length} steps${hits.length ? `; rules hit: ${hits.join(", ")}` : ""}`);
+
+  // Keys: arrows step, Space pauses, Escape closes an open stream tip first
+  // and then the tour, with focus back on the start button.
+  try {
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    press("ArrowRight");
+    const s1 = tour.tourState().step;
+    press("ArrowLeft");
+    const s0 = tour.tourState().step;
+    const p0 = tour.tourState().playing;
+    press(" ");
+    const p1 = tour.tourState().playing;
+    press(" ");
+    const p2 = tour.tourState().playing;
+    const spaceOk = reducedOS ? !p0 && !p1 && !p2 : p0 && !p1 && p2;
+    const g = document.querySelector('#pfd-svg [data-stream="S12"]');
+    const tip = document.getElementById("pfd-tip");
+    g.focus();
+    // A headless page without window focus moves focus but fires no focus
+    // event, so the event that opens the stream tip is sent here.
+    if (tip.hidden) g.dispatchEvent(new FocusEvent("focus"));
+    const tipOpen = !tip.hidden;
+    press("Escape");
+    const tipFirst = tip.hidden && tour.tourState().active;
+    press("Escape");
+    const out = !tour.tourState().active && document.activeElement === start;
+    const buttons = [start, ...bar.querySelectorAll("[data-act]")].every((b) => b.tagName === "BUTTON" && b.type === "button");
+    add("tour_keyboard", s1 === 1 && s0 === 0 && spaceOk && tipOpen && tipFirst && out && buttons,
+      `ArrowRight to step ${s1 + 1}, ArrowLeft to step ${s0 + 1}, Space ${reducedOS ? "no play under reduced motion" : `playing ${p0} then ${p1} then ${p2}`}, Escape closed the stream tip first ${tipFirst}, then the tour with focus on the start button ${out}, every control a button ${buttons}`);
+  } catch (e) {
+    add("tour_keyboard", false, String(e && e.message ? e.message : e));
+  } finally {
+    tour.exitTour(false);
+  }
+
+  // Reduced motion: still steps, nothing running, no auto-advance, no Play.
+  try {
+    await sleep(600);
+    const before = running().length;
+    tour.startTour({ reduced: true });
+    const bad = [];
+    for (let i = 0; i < n; i += 1) {
+      tour.goTour(i);
+      await sleep(60);
+      const extra = running().length - before;
+      if (extra > 0 || tourRunning().length) bad.push(`step ${i + 1}: ${extra} more running`);
+      if (document.querySelector("#pfd-svg .tour-flow")) bad.push(`step ${i + 1}: dashes drawn`);
+    }
+    tour.goTour(0);
+    await sleep(400);
+    const st = tour.tourState();
+    const stays = st.step === 0 && !st.playing && st.still;
+    const noPlay = act("play").hidden;
+    tour.exitTour(false);
+    add("tour_reduced_motion", bad.length === 0 && stays && noPlay,
+      `${n} still steps with ${before} animation(s) running before and none added, stays on step ${st.step + 1}, Play hidden ${noPlay}${bad.length ? `; ${bad.slice(0, 5).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_reduced_motion", false, String(e && e.message ? e.message : e));
+  }
+
+  // Auto-advance at a fast test pace runs to the last step and stops there;
+  // the play-speed dwell of every step lies between 6 and 8 s, under 2 min in all.
+  try {
+    const dwellOk = a.dwell_ms.every((ms) => ms >= 6000 && ms <= 8000) && a.total_ms < 120000;
+    let detail;
+    let pass;
+    if (reducedOS) {
+      start.click();
+      await sleep(500);
+      const st = tour.tourState();
+      tour.exitTour(false);
+      pass = dwellOk && st.active && st.step === 0 && !st.playing;
+      detail = `reduced motion: stays on step ${st.step + 1}, playing ${st.playing}`;
+    } else {
+      tour.startTour({ scale: 0.02 });
+      const done = await until(() => tour.tourState().ended, 10000);
+      const st = tour.tourState();
+      tour.exitTour(false);
+      pass = Boolean(done) && dwellOk && st.step === n - 1 && !st.playing;
+      detail = `ran to step ${st.step + 1} of ${n} and stopped, playing ${st.playing}`;
+    }
+    add("tour_autoplay", pass, `${detail}; dwell ${Math.min(...a.dwell_ms) / 1000} to ${Math.max(...a.dwell_ms) / 1000} s a step, ${a.total_ms / 1000} s in all`);
+  } catch (e) {
+    add("tour_autoplay", false, String(e && e.message ? e.message : e));
+  }
+
+  // The numbers follow the controls: at a rating below the need the first
+  // step shows the engine's infeasibility reason and the new rating, and the
+  // last step states the abatement verdict the engine gives.
+  try {
+    const res = await pageSolve({ rating_mwth: 100 }, true);
+    tour.startTour({ reduced: true, step: 0 });
+    await sleep(80);
+    const warn = document.querySelector("#tour-card .tour-warn");
+    const warnOk = Boolean(res && res.feasibility && res.feasibility.feasible === false && warn && warn.textContent.includes(res.feasibility.reason));
+    const n1 = captionNumbers(rows);
+    const rating = document.querySelector('#tour-card .tn[data-path="kpi.rating_mwth"]');
+    const ratingOk = Boolean(rating && rating.textContent === shownAs(resolvePath(res, "kpi.rating_mwth"), "MWth", 0));
+    tour.goTour(n - 1);
+    await sleep(60);
+    const n13 = captionNumbers(rows);
+    const verdict = document.querySelector("#tour-card .tour-text").textContent
+      .includes(res.targets.abatement.met ? "is met at these inputs" : "is not met at these inputs");
+    tour.exitTour(false);
+    await pageSolve(null, true);
+    const bad = [...n1.bad, ...n13.bad];
+    add("tour_follows_controls", warnOk && ratingOk && verdict && bad.length === 0,
+      `rating 100 MWth: infeasibility reason shown ${warnOk}, rating shown ${rating ? rating.textContent : "none"}, abatement verdict stated ${verdict}, ${n1.count + n13.count} numbers equal to the reply${bad.length ? `; ${bad.slice(0, 4).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_follows_controls", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
 }
 
 if (ON) {
