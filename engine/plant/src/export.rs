@@ -180,6 +180,19 @@ fn cells(line: &str) -> Vec<String> {
     out
 }
 
+/// Two printed cells hold the same value: equal as text, or both numbers that
+/// compare equal, so `-0.000000` and `0.000000` match. A residual near zero can
+/// print with either sign on different platforms, and the status must not
+/// follow that sign.
+fn same_cell(a: &str, b: &str) -> bool {
+    a == b || matches!((a.parse::<f64>(), b.parse::<f64>()), (Ok(x), Ok(y)) if x == y)
+}
+
+/// The cells of two rows, the status cell left out, hold the same values.
+fn same_cells(a: &[String], b: &[String]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| same_cell(x, y))
+}
+
 /// Replace the last cell, the status, of one CSV line.
 fn with_status(line: &str, word: &str) -> String {
     match line.rsplit_once(',') {
@@ -209,7 +222,7 @@ fn mark(head: String, anch: &str, word: Option<&str>) -> Result<String> {
     for (i, (h, a)) in hl.iter().zip(&al).enumerate() {
         let hc = cells(h);
         let ac = cells(a);
-        let differs = hc.len() != ac.len() || hc[..hc.len() - 1] != ac[..ac.len() - 1];
+        let differs = hc.len() != ac.len() || !same_cells(&hc[..hc.len() - 1], &ac[..ac.len() - 1]);
         if i > 0 && differs && hc.last().map(String::as_str) == Some(STATUS) {
             out.push_str(&with_status(h, word));
         } else {
@@ -238,7 +251,9 @@ fn mark_modelled(text: String, word: Option<&str>) -> String {
         let differs = c.len() > 8
             && c[0] == "B_REC_F_MODELLED"
             && c.last().map(String::as_str) == Some(STATUS)
-            && anchored.get(&c[1]).is_some_and(|v| v[..] != c[5..8]);
+            && anchored
+                .get(&c[1])
+                .is_some_and(|v| !same_cells(v, &c[5..8]));
         if differs {
             out.push_str(&with_status(line, word));
         } else {
@@ -3513,6 +3528,19 @@ mod tests {
         assert_eq!(mark(head.to_string(), anch, None).unwrap(), head);
         // Tables of another shape cannot pair.
         assert!(mark(head.to_string(), "id,value,status\n", Some("x")).is_err());
+    }
+
+    #[test]
+    fn a_signed_zero_is_not_a_change() {
+        let head = "id,value,status\nA,-0.000000,anchored_port\nB,1.5,anchored_port\n";
+        let anch = "id,value,status\nA,0.000000,anchored_port\nB,1.50,anchored_port\n";
+        assert_eq!(
+            mark(head.to_string(), anch, Some("gated_T05")).unwrap(),
+            head
+        );
+        assert!(same_cell("NaN", "NaN"));
+        assert!(!same_cell("0.000001", "0.000000"));
+        assert!(!same_cell("text", "0"));
     }
 
     #[test]
