@@ -3,8 +3,7 @@
 Author: Wee Zhern Ray. MIT licence for the project's own work; third-party material keeps its owners' terms (see [Licence and credit](#licence-and-credit)).
 
 - Simulator: https://weewzr.github.io/NUSH2/
-- Final report: [PDF](report/NUSH2_Final_Report.pdf), [DOCX](report/NUSH2_Final_Report.docx)
-- Presentation: [PPTX](presentation/NUSH2_Final_Presentation.pptx), [PDF](presentation/NUSH2_Final_Presentation.pdf)
+- Final report and presentation: to be added in a later commit, as PDF, DOCX and PPTX
 - First-principles derivations: [PDF](math/NUSH2_First_Principles_Derivations.pdf)
 - Design record: [docs/FINAL_DESIGN_DECISIONS.md](docs/FINAL_DESIGN_DECISIONS.md); validation record: [docs/VALIDATION_MATRIX.md](docs/VALIDATION_MATRIX.md)
 
@@ -62,8 +61,6 @@ Each step changes one condition of the step above it (rows `STEPDOWN_` of `resul
 | `scripts/` | Python build and check scripts, standard library only |
 | `docs/` | Design record, validation record and the process flow figure |
 | `references/` | Citation list with DOIs and URLs; no paper is redistributed |
-| `report/` | Final report, PDF and DOCX |
-| `presentation/` | Final presentation, PPTX and PDF |
 | `.github/workflows/` | `ci.yml` (text guard, format, lint, tests) and `site.yml` (tests, results check, site build, browser self test, Pages deploy from `main`) |
 
 | Crate | Role |

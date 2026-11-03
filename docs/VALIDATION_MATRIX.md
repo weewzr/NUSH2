@@ -11,7 +11,7 @@ Abbreviations follow `docs/FINAL_DESIGN_DECISIONS.md`: SMR means steam methane r
 - A row is written as `pass` or `fail` only after it ran against a limit. A row printed with no limit is `reported`. A benchmark that cannot run is written as `not_run` with its reason, from section 18 where it is listed there.
 - Code tests and literature benchmarks are separate. `cargo test` checks code correctness and regressions and must be green. Literature benchmarks run through `nush2_vv` and write rows with their status. A test of a benchmark asserts that the row is produced, finite and judged against the unchanged limit, never that it passes.
 - Numbers come from `engine/vv/data/benchmarks/` and `engine/vv/data/props/`. No literature value is typed into a test. Where a unit crate holds a typed copy of a printed number, a harness row checks the copy against the fixture (T961-FIXTURE, XF-2-TABLES, AR-1-FIXTURE). One exception is stated here: the JAERI-Tech 2005-031 values are typed in `nush2_units::jaeri`, each with its sheet and PDF page, and have neither a fixture nor a transcription row (section 19).
-- A fixture holds only values a test or benchmark reads, each with its source and page. Where a benchmark does not run, its row carries the single printed target when the matrix names one, and the other values were removed. Removed values stay in the repository history at commit `eaf9327`, which added the fixtures.
+- A fixture holds only values a test or benchmark reads, each with its source and page. Where a benchmark does not run, its row carries the single printed target when the matrix names one, and the other values were removed. Removed values are not published; each can be extracted again from the cited source page. The first full extraction, before the trim, is called extraction E0 below.
 - Data use takes one of three values, as in `results/Validation_Results.csv`:
 
 | Value | Meaning |
@@ -60,9 +60,9 @@ Each file holds one source. The columns are the same in all of them.
 | `read_uncertainty` | The printed plus or minus value, or the figure reading band, in the row's unit. Blank when neither applies |
 | `conditions` | Semicolon list of `key=value` |
 
-Rows at `eaf9327` counts the fixture as extracted. Rows now counts it after decision S7, which keeps only the values a benchmark reads. The harness tests `fixtures_hold_only_read_values` and `column_rows_and_fixtures` fail if a stored row is never read, and an export from the full `eaf9327` fixtures, with the one row added below, gives the same `Validation_Results.csv`, byte for byte, as the trimmed set. A file that no benchmark reads was removed.
+Rows in E0 counts the fixture as extracted. Rows now counts it after decision S7, which keeps only the values a benchmark reads. The harness tests `fixtures_hold_only_read_values` and `column_rows_and_fixtures` fail if a stored row is never read, and an export from the full E0 fixtures, with the one row added below, gives the same `Validation_Results.csv`, byte for byte, as the trimmed set. A file that no benchmark reads was removed.
 
-| File | Source | Rows at `eaf9327` | Rows now | Printed page |
+| File | Source | Rows in E0 | Rows now | Printed page |
 |---|---|---|---|---|
 | `tev953.csv` | INL TEV-953 Rev. 0, 2010 | 149 | 27 | PDF - 1 |
 | `tev961.csv` | INL TEV-961 Rev. 0, 2010 | 285 | 56 | PDF - 1 |
@@ -83,11 +83,11 @@ Rows at `eaf9327` counts the fixture as extracted. Rows now counts it after deci
 | `brigman_2014.csv` | Brigman et al., Energy Procedia 63 (2014) 6012-6022 | 68 | 3 | PDF + 6011 |
 | `iaea_tecdoc_1236.csv` | IAEA-TECDOC-1236, 2001 | 120 | 45 | PDF - 6 |
 
-The trim added one row: `tev953.csv` now holds the stage 1 steam to carbon ratio of 3.00 from block NG-RFMR (A-42 PDF p76), which T953-1 reads. Section 19 lists the fixtures added after `eaf9327` for the sources outside this list, and `engine/vv/data/props/` holds the property fixtures of the M2 rows, each citing its table and page in comment lines.
+The trim added one row: `tev953.csv` now holds the stage 1 steam to carbon ratio of 3.00 from block NG-RFMR (A-42 PDF p76), which T953-1 reads. Section 19 lists the fixtures added after E0 for the sources outside this list, and `engine/vv/data/props/` holds the property fixtures of the M2 rows, each citing its table and page in comment lines.
 
 ### How the extraction was checked
 
-These checks ran on the full extraction at `eaf9327`, before the trim.
+These checks ran on the full extraction E0, before the trim.
 
 | Check | Result |
 |---|---|
@@ -146,7 +146,7 @@ INL model results, Aspen with Gibbs minimisation, with no plant measurement behi
 | T953-3 | 1 | HTGR with capture, 663671 lb/h, 1292 to 807 F (A-45 PDF p79) | Process heat | 117 (Table 2 PDF p30) | MWt | `props::helium::duty_w`, test `tev953_process_heat` (new) | 1.0%, printed to three figures | `same_dataset_disclosed` | Run, pass |
 | T953-4 | 5 | Conventional without capture, 29000 lb/h H2 | CO2 intensity | 3205 short ton/day (Table 2 PDF p30), which gives 9.21 kg/kg by calculation | kg/kg | `plant::emissions`, the 9.21 kg/kg baseline | 0.1% | `same_dataset_disclosed` | Run, pass |
 
-T953-4 checks the conversion behind the 9.21 baseline, which is an input to the emissions ledger. No benchmark read the steam, water and capture rows of `tev953.csv`, so the S7 trim removed them. A later Level 3 or 4 comparison that needs them takes them from commit `eaf9327` with their citations.
+T953-4 checks the conversion behind the 9.21 baseline, which is an input to the emissions ledger. No benchmark read the steam, water and capture rows of `tev953.csv`, so the S7 trim removed them. A later Level 3 or 4 comparison that needs them extracts them again from the cited sheets.
 
 T953-2 failed as section 3 expected. Pure methane at S/C 3 stands in for the conventional feed, and the 2.2 point gap has the size that substitution predicts.
 
@@ -167,7 +167,7 @@ The local PDF ends at A-59, the end of Case 5. Case 6, the design case, survives
 
 The T961-7 row is the gate for flipping term T05. If it misses, T05 stays anchored and the row stays failed.
 
-The six preheater duties PRE-HT-1 to PRE-HT-6 on A-55 are left out of the fixture. The scan does not separate the digits 3, 6 and 8 reliably. Helium enthalpy and the sum to 568.4 MMBtu/h suggest values, and the fixture holds no inferred value. The equivalent TEV-953 sheet, A-45, has a text layer; its duties were extracted at `eaf9327` and removed by the trim, since no benchmark reads them.
+The six preheater duties PRE-HT-1 to PRE-HT-6 on A-55 are left out of the fixture. The scan does not separate the digits 3, 6 and 8 reliably. Helium enthalpy and the sum to 568.4 MMBtu/h suggest values, and the fixture holds no inferred value. The equivalent TEV-953 sheet, A-45, has a text layer; its duties were extracted in E0 and removed by the trim, since no benchmark reads them.
 
 T961-1 at the 825 C reactor outlet misses its 0.15% limit by 0.03 points (149.37 against 149.1 MWt, 0.18%). The other four cases pass. The row stays failed.
 
@@ -201,11 +201,11 @@ WGS-HTS uses Chinchen pseudo first order kinetics, so Chinchen Table 1 is calibr
 
 KR-1 is a weak test. The catalyst differs and the gas carries H2S and tar. Hydrogen was closed by balance and never measured, and OP1 was the point Kraussler used to improve the model. The reactor ran at ambient pressure against about 30 bar in the plant. Kraussler's power law stays unported, because its CO exponent and pressure base do not extrapolate to plant pressure. The KR-1 rows carry the four printed outlet values, and the trim removed the rest of the file.
 
-Chinchen Table 2 row 1 prints one value at 400 C under the 330 C column, marked by footnote d. The fixture at `eaf9327` carried it at 400 C. CH-3 does not run, so the trim removed Table 2, and Tables 3 and 5 with it. See section 18 for why Tables 3 and 5 do not run.
+Chinchen Table 2 row 1 prints one value at 400 C under the 330 C column, marked by footnote d. The fixture in E0 carried it at 400 C. CH-3 does not run, so the trim removed Table 2, and Tables 3 and 5 with it. See section 18 for why Tables 3 and 5 do not run.
 
 ## 8. Zhang, Que and Chen electrolyte NRTL
 
-No engine comparison can run from this source. See Z-1 in section 18. The fixture at `eaf9327` held Table 8 and Table 10 parameters with their standard deviations, plus the data inventory of Tables 7, 9 and 11, which list ranges and deviations with no data points. No benchmark reads them, so the trim removed the file.
+No engine comparison can run from this source. See Z-1 in section 18. The fixture in E0 held Table 8 and Table 10 parameters with their standard deviations, plus the data inventory of Tables 7, 9 and 11, which list ranges and deviations with no data points. No benchmark reads them, so the trim removed the file.
 
 The inventory gives context for the VLE tolerances. Zhang's own model reaches AARD 33.5% on Jou and 35.5% on Hilliard (Table 9 PDF p6). The 25% limit on the Aronu rows sits below both figures, though the datasets differ.
 
@@ -232,7 +232,7 @@ Density and viscosity in the engine use Weiland, so Hartono is an out of sample 
 | HA-2 | 1 | 30 mass%, same grid, two repeats, 96 points | Viscosity | 2.874 to 0.740 unloaded, Table 7 PDF p5 | mPa s | `mea::viscosity::viscosity_pa_s`, test `viscosity_weiland` | AARD 3% | `independent` | Run, pass |
 | HA-3 | 1 | 30 mass%, 25.2 to 87.1 C, loading 0 to 0.50, 22 points | N2O Henry constant against Khan Eq 8 with the N2O analogy | 4.67 to 25.32, Table 11 PDF p6 | kPa m3/mol | `mea::kinetics::henry_khan_pa_m3_mol`, test `khan_henry_against_hartono_table11` | AARD 30%, set from the 24.3% VLE scatter. The existing test only guards units, ratio 0.2 to 2.0 | `independent` | Run, fail. Failed: AARD 40.41% against the 30% limit |
 
-The M3 tests hold 24 of the 48 density points, 24 viscosity points and 20 of the 22 Henry points. The harness runs the full sets above at the same limits. The 6.2 mass% rows, extracted at `eaf9327`, were removed by the trim: no gate used them, because that concentration lies far from the 30 wt% basis.
+The M3 tests hold 24 of the 48 density points, 24 viscosity points and 20 of the 22 Henry points. The harness runs the full sets above at the same limits. The 6.2 mass% rows, extracted in E0, were removed by the trim: no gate used them, because that concentration lies far from the 30 wt% basis.
 
 HA-3 failed, as section 3 expected. Khan Eq 8 has no loading term, and the measured Henry constant rises with loading.
 
@@ -259,17 +259,17 @@ The engine's ABS uses the Khan closure as a set. These runs validated that closu
 | KH-3 | 2 | Run T22, 7 heights | Gas CO2 profile | 19.12 to 0.00 (Fig 3a PDF p5, vector read, band 0.10) | mol% | `units::absorber` (M6), test `absorber_khan_t22_profile` (new) | RMS 2.0 mol%. The figure itself shows about this error for Khan's model | `same_dataset_disclosed` | Not run: Khan prints no specific area or critical surface tension for these packings and no local source holds them, so Onda Eqs 5a to 5c cannot run |
 | KH-4 | 2 | Run T22, 7 heights | Liquid MEA profile | 343 to 3006 (Fig 3b PDF p5, vector read, band 15) | mol/m3 | `units::absorber` (M6), test `absorber_khan_t22_profile` (new) | RMS 300 mol/m3 | `same_dataset_disclosed` | Not run: Khan prints no specific area or critical surface tension for these packings and no local source holds them, so Onda Eqs 5a to 5c cannot run |
 
-Removal of 100.0 printed for T22 saturates, so KH-1 discriminates little. KH-3 and KH-4 carry the real content. The Aroonwilas run prints no removal value. Its conditions and the Fig 3 profile points were extracted at `eaf9327`, and the trim removed them because no Khan row runs. `khan_2011.csv` keeps the five printed removals that KH-1 and KH-2 carry.
+Removal of 100.0 printed for T22 saturates, so KH-1 discriminates little. KH-3 and KH-4 carry the real content. The Aroonwilas run prints no removal value. Its conditions and the Fig 3 profile points were extracted in E0, and the trim removed them because no Khan row runs. `khan_2011.csv` keeps the five printed removals that KH-1 and KH-2 carry.
 
 ## 13. Isa high-pressure absorption
 
-All Isa runs use 20 wt% pure aqueous MEA once through, on CO2 and CH4 at 1:1. Regeneration was unavailable on the pilot (PDF p7). Table 9 and Fig 7 captions call P a CO2 partial pressure, while Table 3 heads the same numbers "Pressure". The fixture at `eaf9327` kept `P_bar` as printed, and a harness route must state which reading it uses.
+All Isa runs use 20 wt% pure aqueous MEA once through, on CO2 and CH4 at 1:1. Regeneration was unavailable on the pilot (PDF p7). Table 9 and Fig 7 captions call P a CO2 partial pressure, while Table 3 heads the same numbers "Pressure". The fixture in E0 kept `P_bar` as printed, and a harness route must state which reading it uses.
 
 | ID | Level | Conditions | Quantity | Literature value, locator | Units | Engine call | Tolerance | Data use | Status |
 |---|---|---|---|---|---|---|---|---|---|
 | IS-1 | 2 | Pressures up to 50 bar, inlet as Table 3 PDF p4, 1.505 m, 0.145 m, Flexipac 1Y | Y CO2 at column top | 0.05 experiment, 0.055 Isa model (Conclusions PDF p13) | mol CO2/mol CH4 | `units::absorber` (M6), test `absorber_isa_ytop` (new) | 0.05 absolute | `independent` | Not run: no route was built; the absorber would need the Table 3 inlet state at each pressure |
 
-IS-1 is the only Isa benchmark. Table 9 fails its own mass balance and does not run (I-1 in section 18). At `eaf9327` the fixture also held Tables 3, 7, 8, 10 and 12. Tables 7 to 12 are Isa's model outputs, and the engine does not use the index f. IS-1 does not run, so the trim kept only its printed target.
+IS-1 is the only Isa benchmark. Table 9 fails its own mass balance and does not run (I-1 in section 18). In E0 the fixture also held Tables 3, 7, 8, 10 and 12. Tables 7 to 12 are Isa's model outputs, and the engine does not use the index f. IS-1 does not run, so the trim kept only its printed target.
 
 ## 14. Abdul Halim high-pressure experiments
 
@@ -280,7 +280,7 @@ Bench column 0.046 m by 2.04 m with Sulzer metal gauze, at 5.0 MPa on 20% CO2 in
 | AH-1 | 2 | Eight conditions, 1.0 to 4.0 kmol/m3 MEA, 6 heights | Column temperature profile | 30.5 to 46.2 (Table 3 PDF p5) | C | `units::absorber` (M6), test `absorber_halim_profiles` (new) | RMS 5 K. About twice the 2.8 C average error of a pilot model in the design evidence, since wall loss here is unknown | `independent` | Not run: the Sulzer gauze geometry is not in the packing set and the paper prints no lean loading |
 | AH-2 | 2 | 1.0 kmol/m3, 19.72 kmol/m2/h, 27 C, liquid load 1.81 to 4.51 m3/m2/h | Rise in CO2 removal | 52.59 (text PDF p4) | % | `units::absorber` (M6), test `absorber_halim_liquid_trend` (new) | Sign, then 20 points | `independent` | Not run: the Sulzer gauze geometry is not in the packing set and the paper prints no lean loading |
 
-Removal and KGav values appear in raster figures and were not read. The text gives KGav in mol/m2/h/kPa while Fig 6 labels mol/m3.h.kPa, so those two rows were stored as printed at `eaf9327`. No gate used them, and the trim removed them with the Table 3 profiles, since AH-1 and AH-2 do not run. The fixture keeps the AH-2 target. The sentence that KGav "has reduced to about 17%" reads as a reduction by 17% against Fig 6, and it also runs no gate.
+Removal and KGav values appear in raster figures and were not read. The text gives KGav in mol/m2/h/kPa while Fig 6 labels mol/m3.h.kPa, so those two rows were stored as printed in E0. No gate used them, and the trim removed them with the Table 3 profiles, since AH-1 and AH-2 do not run. The fixture keeps the AH-2 target. The sentence that KGav "has reduced to about 17%" reads as a reduction by 17% against Fig 6, and it also runs no gate.
 
 ## 15. Salvinder high-pressure pilot
 
@@ -335,7 +335,7 @@ This report is a design study and prints no measured data from a coupled HTTR st
 | IA-4 | 1 | HTTR reformer, 830 C, 4.5 MPa, S/C 3.5 (PDF p52, p53) | Conversion | About 68 (PDF p53) | % | `props::equilibrium::reform`, test `httr_sr_design` (new) | 5 points, as printed with "about" | `independent` | Run, pass |
 | IA-5 | 2 | EVA, helium heated tube, exit | Conversion below equilibrium | 1 to 2.5 (PDF p71) | points | `units::smr_tube` (M5), test `smr_tube_tends_to_equilibrium` | Plausibility, 2.5 points | `independent` | Run, pass |
 
-Equilibrium temperature in Tables 2.1 and 2.2 is printed about 10 K below the product exit temperature (PDF p12). The test uses the equilibrium temperature. The fixture keeps the HTTR text values that IA-4 reads. Table 3-4 values were extracted at `eaf9327`, and the trim removed them because no benchmark reads them. The IHX benchmark `ihx_benchmarks_10_3` depends on Tochio Table 2 and TECDOC-1382, which are not in this list (section 19).
+Equilibrium temperature in Tables 2.1 and 2.2 is printed about 10 K below the product exit temperature (PDF p12). The test uses the equilibrium temperature. The fixture keeps the HTTR text values that IA-4 reads. Table 3-4 values were extracted in E0, and the trim removed them because no benchmark reads them. The IHX benchmark `ihx_benchmarks_10_3` depends on Tochio Table 2 and TECDOC-1382, which are not in this list (section 19).
 
 ## 18. Benchmarks that cannot run from local sources
 
@@ -357,7 +357,7 @@ Equilibrium temperature in Tables 2.1 and 2.2 is printed about 10 K below the pr
 | S-1 | SRD at high pressure | Isa, Abdul Halim and Salvinder all run once through. None measured regeneration | VI and BR rows, all on flue gas, disclosed as a regime gap | Not run, reason in this row |
 | S-2 | 30 wt% MEA at high pressure | Isa and Salvinder use 20 wt%, and Abdul Halim stops at 4 kmol/m3 | 20 wt% rows, disclosed as a concentration gap | Not run, reason in this row |
 | S-3 | MEA on H2-rich syngas | No local absorber study uses H2-rich gas | None. The absorber carries `ReducedOrder` status at plant conditions | Not run, reason in this row |
-| V-1 | Split flow and interheating | Both need a stripper configuration the plant flowsheet does not contain. The two fixtures were removed by the trim and remain at `eaf9327` | None | Not run, reason in this row |
+| V-1 | Split flow and interheating | Both need a stripper configuration the plant flowsheet does not contain. The two fixtures were removed by the trim and were part of extraction E0 | None | Not run, reason in this row |
 | HT-1 | HTTR heat utilisation performance | TECDOC-1236 gives design intent for the coupled reformer and prints no measured data from it | IA-1 to IA-4 as code comparisons | Not run, reason in this row |
 | HE-2-MU | Helium viscosity at 700, 900, 1100 and 1200 K and 50 bar against NIST TN-1334 (Arp, McCarty and Friend 1998) | TN-1334 is not in the local library and CoolProp is not installed, so no independent value is held. The limit is frozen here before any run at twice Petersen's stated standard deviation, 0.003 T % (3.5% at 1173 K) | `helium_petersen_points`, which verifies the transcription against Petersen's own table | Not run, reason in this row |
 | HE-2-K | Helium conductivity at the same states against NIST TN-1334 | As HE-2-MU. Limit frozen at 0.007 T % (8.2% at 1173 K) | As HE-2-MU, and `eq_b_02_cp_is_the_monatomic_ideal_value` checks c_p against 5/2 R/M within 0.1% | Not run, reason in this row |
@@ -365,7 +365,7 @@ Equilibrium temperature in Tables 2.1 and 2.2 is printed about 10 K below the pr
 
 ## 19. Benchmarks outside the sources above
 
-The engine test list also names JAERI-Tech 2005-031 (A-2 to A-5), Yin, Tochio, TECDOC-1382, DICE, Kwak, Morgan, Sonderby, Tan and IEAGHG Case 1A. These lie outside the sources of sections 4 to 17, so this file froze no tolerance for them when it was added. Their limits were set at design, before the rows ran, and M5 and M6 added fixtures for the column sources after `eaf9327`: `tan_2015.csv`, `sonderby_2013.csv`, `dice_2020.csv`, `kwak_2012.csv` and `morgan_2018.csv`, each holding only the values its benchmark reads, with source and page. The JAERI values are typed constants in `nush2_units::jaeri`, each with its sheet and PDF page, and have no fixture. Dugas Table 4.4 sits in `engine/mea/tests/data/`.
+The engine test list also names JAERI-Tech 2005-031 (A-2 to A-5), Yin, Tochio, TECDOC-1382, DICE, Kwak, Morgan, Sonderby, Tan and IEAGHG Case 1A. These lie outside the sources of sections 4 to 17, so this file froze no tolerance for them when it was added. Their limits were set at design, before the rows ran, and M5 and M6 added fixtures for the column sources after E0: `tan_2015.csv`, `sonderby_2013.csv`, `dice_2020.csv`, `kwak_2012.csv` and `morgan_2018.csv`, each holding only the values its benchmark reads, with source and page. The JAERI values are typed constants in `nush2_units::jaeri`, each with its sheet and PDF page, and have no fixture. Dugas Table 4.4 sits in `engine/mea/tests/data/`.
 
 The export also carries the property rows of M2 and the plant and flowsheet rows, which check the code against the earlier screening calculation (frozen in `engine/vv/data/freeze_values.json` and `engine/vv/data/screening_checks.csv`) and the Level 3 flowsheet. All of them are listed here with their status.
 
@@ -402,12 +402,12 @@ As exported with this revision, `results/Validation_Results.csv` holds 650 rows:
 | Aronu Table 3 | Rows at Ptot 505.3 and 671.9 print the same model value and loading. The page does not say which row is the repeat, and the port agrees better with the 505.3 row (section 9) | The 505.3 row is flagged and excluded, disclosed in section 9 and in the row AR-1-FIXTURE |
 | Aronu Tables 3, 5 | The corrigendum replaces both, and also prints 858.45 and 998.77 where the original has more digits | Corrigendum used |
 | Hartono Tables 3, 7, 11 | Text layer glues reference superscripts onto values | Literature rows excluded |
-| Xu-Froment Table 5 | KH2O lower limit prints 0.0317, far from the mean of 0.4152 given an upper limit of 0.5032 | Stored as `_LL_printed` at `eaf9327`, unused, and removed by the trim |
+| Xu-Froment Table 5 | KH2O lower limit prints 0.0317, far from the mean of 0.4152 given an upper limit of 0.5032 | Stored as `_LL_printed` in E0, unused, and removed by the trim |
 | Xu-Froment PDF p7 | A(KH2) prints 6.13e-9 in text and 6.12e-9 in Table 6 | Table 6 used |
 | TECDOC-1236 Table 3-4 | Tube outer diameter prints 3.2 mm beside a 3.5 mm wall | Left out |
 | TECDOC-1236 Table 5-3 | Helium side does not close, see HT-2 | No gate |
 | Isa Table 9 | Fails the mass balance, see I-1 | No gate |
-| Isa Table 9, Fig 7 | P labelled as CO2 partial pressure while Table 3 heads it Pressure | Stored as printed at `eaf9327`, removed by the trim since IS-1 does not run |
+| Isa Table 9, Fig 7 | P labelled as CO2 partial pressure while Table 3 heads it Pressure | Stored as printed in E0, removed by the trim since IS-1 does not run |
 | Abdul Halim PDF p4 | KGav unit differs between text and Fig 6 | No gate |
 | Abdul Halim, whole paper | Lean loading is printed nowhere | Harness states its assumption |
 | TEV-961 A-55 | Preheater duty labels unreadable in the scan | Left out |
