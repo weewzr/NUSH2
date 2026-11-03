@@ -1,0 +1,67 @@
+# Build output
+/build/
+target/
+/frontend/pkg/
+/site/
+_site/
+*.wasm
+
+# Papers, office files, recordings
+*.pdf
+!/math/NUSH2_First_Principles_Derivations.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+*.xlsm
+*.mp4
+*.mov
+
+# LaTeX intermediates
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.xdv
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+secrets*
+credentials*
+
+# Machine and editor files
+.claude/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+~$*
+*.tmp
+
+# Report and presentation folders stay local, except the four final files.
+# These lines come last so that the negations override the file-type rules above.
+/report/*
+/presentation/*
+!/report/NUSH2_Final_Report.pdf
+!/report/NUSH2_Final_Report.docx
+!/presentation/NUSH2_Final_Presentation.pptx
+!/presentation/NUSH2_Final_Presentation.pdf
