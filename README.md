@@ -3,7 +3,8 @@
 Author: Wee Zhern Ray. MIT licence for the project's own work; third-party material keeps its owners' terms (see [Licence and credit](#licence-and-credit)).
 
 - Simulator: https://weewzr.github.io/NUSH2/
-- Final report and presentation: to be added in a later commit, as PDF, DOCX and PPTX
+- Final report: [PDF](report/NUSH2_Final_Report.pdf), [DOCX](report/NUSH2_Final_Report.docx)
+- Presentation: [PPTX](presentation/NUSH2_Final_Presentation.pptx), [PDF](presentation/NUSH2_Final_Presentation.pdf)
 - First-principles derivations: [PDF](math/NUSH2_First_Principles_Derivations.pdf)
 - Design record: [docs/FINAL_DESIGN_DECISIONS.md](docs/FINAL_DESIGN_DECISIONS.md); validation record: [docs/VALIDATION_MATRIX.md](docs/VALIDATION_MATRIX.md)
 
@@ -61,6 +62,8 @@ Each step changes one condition of the step above it (rows `STEPDOWN_` of `resul
 | `scripts/` | Python build and check scripts, standard library only |
 | `docs/` | Design record, validation record and the process flow figure |
 | `references/` | Citation list with DOIs and URLs; no paper is redistributed |
+| `report/` | Final report, PDF and DOCX |
+| `presentation/` | Final presentation, PPTX and PDF |
 | `.github/workflows/` | `ci.yml` (text guard, format, lint, tests) and `site.yml` (tests, results check, site build, browser self test, Pages deploy from `main`) |
 
 | Crate | Role |
@@ -151,6 +154,6 @@ The consequences are carried into the results. The column gate failed, so the sp
 
 MIT licence, see [LICENSE](LICENSE). Copyright (c) 2026 Wee Zhern Ray. Third-party images and Rust crates are outside that licence; see the notice below and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) beside `LICENSE` in the repository root.
 
-**Third-party content.** Figures and photographs in the report and the presentation that are credited to other sources, and any other third-party image in them, belong to their owners. They are not covered by the MIT licence, and this repository grants no right to reuse them. The Rust crates compiled into the engine and its WebAssembly module keep their own licences, listed with their full texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+**Third-party content.** Figures and photographs in the report and the presentation that are credited to other sources, and any other third-party image in them, belong to their owners. They are not covered by the MIT licence, and this repository grants no right to reuse them. Each one is listed by slide or figure, with what it shows and its source as printed, in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#third-party-images-in-the-report-and-the-presentation). The Rust crates compiled into the engine and its WebAssembly module keep their own licences, listed with their full texts in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 OUTRAM PARK (github.com/theodoreOnzGit/outram-park-backend) was consulted as a reference; no OUTRAM PARK code is included and no endorsement is implied. The concepts drawn from it, each checked by this repository's own tests, are listed at the end of `docs/FINAL_DESIGN_DECISIONS.md`.
