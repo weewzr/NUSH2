@@ -127,7 +127,8 @@ function select(id, opts = {}) {
   renderPanelNow();
 }
 
-/** Scroll the sideways scroller so the unit sits in view. Display geometry only. */
+/** Scroll the sideways scroller so the unit sits in view. Display geometry only.
+ * The scroll jumps when the reader asks for reduced motion. */
 function reveal(id) {
   const g = el.svg.querySelector(`[data-unit="${CSS.escape(id)}"]`);
   const box = el.scroll;
@@ -135,7 +136,8 @@ function reveal(id) {
   const r = g.getBoundingClientRect();
   const b = box.getBoundingClientRect();
   const target = box.scrollLeft + (r.left - b.left) - (b.width - r.width) / 2;
-  box.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  box.scrollTo({ left: Math.max(0, target), behavior: still ? "auto" : "smooth" });
 }
 
 function move(from, step) {
@@ -308,6 +310,30 @@ function onRoute() {
   if (!selected) select(order()[0]);
   else renderPanelNow();
   if (validation === undefined) loadValidation();
+  // A new reply re-renders the numbers of the running tour step.
+  if (tour) tour.refreshTour();
+}
+
+// The guided process tour loads apart from the drawing, so a fault there
+// leaves unit selection, panels and tooltips working.
+let tour = null;
+
+function loadTour() {
+  import("./tour.js?v=__COMMIT__")
+    .then((m) => {
+      m.initTour({
+        state: api.state,
+        svg: el.svg,
+        scroll: el.scroll,
+        tip: el.tip,
+        panel: el.panel,
+        select: (id) => select(id),
+        selected: () => selected,
+        defs: () => defs,
+      });
+      tour = m;
+    })
+    .catch((err) => console.error(`The process tour did not load: ${err && err.message ? err.message : err}`));
 }
 
 /** Section counts of every unit panel at the current result, for the self-test. */
@@ -342,6 +368,7 @@ export async function initPfd(a) {
   await loadDefs();
   labelStreams();
   loadFlows();
+  loadTour();
   if (api.state.route === "pfd") onRoute();
 }
 
