@@ -150,10 +150,9 @@
 .tour-tag[data-tag="stale"] { color: var(--stale); }
 .tour-tag[data-tag="external"] { border-style: dashed; border-color: #8d8aa3; background: var(--page); }
 
+/* The space between a number and its unit is a no-break space in the text. */
 .tn { color: var(--title); font-weight: 700; font-variant-numeric: tabular-nums; }
-.tu { margin-left: 0.2em; color: var(--ink-2); font-weight: 600; }
-.tu.pct { margin-left: 0; }
-.tpre { color: var(--muted); font-size: 0.84em; }
+.tu { color: var(--ink-2); font-weight: 600; }
 
 .tour-media { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; padding: 0; list-style: none; color: var(--ink-2); font-size: 0.8rem; }
 .tour-media .sw { display: inline-block; width: 20px; height: 7px; margin-right: 6px; border-radius: 4px; vertical-align: 1px; }
@@ -183,6 +182,11 @@
 .tour-notes { margin: 0; padding: 0 0 0 16px; color: var(--ink-2); font-size: 0.8rem; line-height: 1.45; }
 .tour-notes li + li { margin-top: 3px; }
 .tour-motion { margin: 8px 0 0; color: var(--muted); font-size: 0.76rem; }
+
+/* Previous and Next again under the card, with the keys the tour answers. */
+.tour-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 14px 12px; border-top: 1px solid var(--rule); }
+.tour-foot .tour-buttons { flex: 0 0 auto; }
+.tour-keys { flex: 1 1 200px; margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
 
 /* Illustration insets */
 .tour-inset { margin: 0 0 10px; overflow: hidden; border: 1px solid var(--rule); border-radius: 6px; }
@@ -230,6 +234,10 @@
 #pfd-svg.is-touring:not(.tour-all) :is(.pfd-units > .unit, .pfd-streams > .st, .pfd-labels > text, .pfd-stack, .pfd-boundary, .pfd-divider, .pfd-section).tour-ctx { opacity: 0.55; }
 #pfd-svg.is-touring:not(.tour-all) :is(.pfd-units > .unit, .pfd-streams > .st, .pfd-labels > text, .pfd-stack, .pfd-boundary, .pfd-divider, .pfd-section).tour-on { opacity: 1; }
 #pfd-svg.is-touring .unit.tour-on { filter: drop-shadow(0 0 7px rgba(106, 43, 209, 0.5)); }
+/* The tour's lead unit is marked by its glow; its selection ring would cross
+   the labels beside the power block and the cryogenic unit. Any other unit the
+   reader selects keeps its ring, and so does a unit with keyboard focus. */
+#pfd-svg.is-touring .unit.tour-lead[aria-pressed="true"]:not(:focus-visible) .ring { stroke: none; }
 #pfd-svg.is-touring .st.tour-move .core { stroke-width: 9; }
 #pfd-svg.is-touring .st.tour-move .cas { stroke-width: 13; }
 #pfd-svg.is-touring .st-vent.tour-move .vent { stroke-width: 9; }

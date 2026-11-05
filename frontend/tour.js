@@ -8,9 +8,9 @@
 // and fills a caption card beside the drawing.
 //
 // Every number in a caption is read at render time from the live engine reply
-// (state.lastOk) by its reply path, so it follows the controls. Where the reply
-// has no field, the number comes from a results row that scripts/build_site.py
-// copies into data/tour_rows.json, and the caption marks it as precomputed.
+// (state.lastOk) by its reply path, so it follows the controls. A limit the
+// reply holds no number for is stated in words, or through the unit's
+// limitation text of units.json, which the page fills from the same reply.
 // This file formats numbers (decimals, and a fraction shown as a percentage)
 // and computes no engineering quantity. Pictures and reaction lines drawn
 // without engine data carry an Illustration tag.
@@ -40,13 +40,11 @@ const MEDIA = {
 };
 
 // What a number is: read from the reply and moving with the controls, an echo
-// of a control, a fixed registry value, or a precomputed results row.
-const KIND = { live: "Live", input: "Input", fixed: "Fixed value", pre: "Precomputed" };
+// of a control, or a fixed registry value.
+const KIND = { live: "Live", input: "Input", fixed: "Fixed value" };
 
 /** A number read from the live reply at `p`. */
 const N = (p, u, d, k, l) => ({ p, u, d, k, l });
-/** A number read from data/tour_rows.json under `row`. */
-const R = (row, u, d, l) => ({ row, u, d, k: "pre", l });
 
 // Numbers several steps share.
 const ROT = N("units.htgr.conditions.ROT.value", "C", 0, "fixed", "Reactor outlet");
@@ -54,11 +52,30 @@ const T_SUP = N("units.smr.conditions.T_HE_SUPPLY.value", "C", 0, "fixed", "Heli
 const RECYCLED = N("units.cryogenic.results.recycled_c.value", "kmol/h", 0, "live", "Carbon recycled to the reformer");
 const Q_REB = N("kpi.q_reboiler_mw", "MW", 1, "live", "Reboiler duty");
 const TAIL_HEAT = N("balances.energy.tail_gas_to_reboiler.value", "MW", 1, "live", "Tail gas heat to the reboiler");
+const BRANCH = "units.power.inputs.branch.value";
+const STEAM_GAP = "balances.energy.reactor_steam_to_reboiler.value";
+const UNMET_HEAT = "balances.energy.unmet_thermal.value";
 
-// Lines that carry nothing when the PSA reject leaves the plant or is burned
-// on site, since the drawing shows the reject recycled.
-const RECYCLE_LINES = ["S14", "R1", "S21", "S03", "S15", "S16"];
-const rejectLeaves = (c) => c.x.tail_gas === "export" || c.x.tail_gas === "burn_on_site";
+// What happens to the PSA reject. The drawing shows it recycled; when it is
+// exported, the recycle lines and the stack carry nothing, and when it is
+// burned on site, the reject reaches the burner, which the stack stands for,
+// while the cryogenic lines carry nothing.
+const exported = (c) => c.x.tail_gas === "export";
+const burned = (c) => c.x.tail_gas === "burn_on_site";
+const rejectLeaves = (c) => exported(c) || burned(c);
+const selexol = (c) => c.x.tail_gas === "inl_selexol";
+const recycles = (c) => c.q(RECYCLED.p) > 0;
+const hasReboiler = (c) => c.q(Q_REB.p) > 0;
+const CRYO_LINES = ["R1", "S21", "S03", "S15"];
+const idle = (c) => (exported(c) ? ["S14", ...CRYO_LINES, "S16"] : burned(c) ? CRYO_LINES : []);
+
+// Heat duties above the rated reactor: the IHX and reformer figures are then
+// what the plant would need, and the warning gives the engine's reason. With no
+// field to read, an infeasible plant is treated the same way.
+const heatShort = (c) => {
+  const v = c.q(UNMET_HEAT);
+  return v === null ? !c.feasible : v > 0;
+};
 
 // The steps. `units` are lit, `flows` are groups of streams animated in order
 // (a group's lines move together), `ctx` and `ctxUnits` are lines and units
@@ -68,7 +85,7 @@ const rejectLeaves = (c) => c.x.tail_gas === "export" || c.x.tail_gas === "burn_
 const STEPS = [
   {
     id: "fission",
-    title: "Fission heat in the HTGR core",
+    title: "Fission heat in the reactor core",
     ms: 8000,
     units: ["htgr"],
     marks: ["core"],
@@ -85,7 +102,7 @@ const STEPS = [
     },
     figs: ["rot", "rating", "output", "surplus"],
     text: (c) => [
-      "Inside the core, uranium nuclei in the TRISO fuel particles split when they absorb a neutron, and the graphite slows the new neutrons so the chain reaction carries on.",
+      "Inside the core of the high-temperature gas-cooled reactor (HTGR), uranium nuclei in the tristructural isotropic (TRISO) fuel particles split when they absorb a neutron, and the graphite moderator slows the new neutrons so the chain reaction carries on.",
       c.feasible
         ? "The fission heat passes to helium flowing through the core, which leaves at {rot}. The reactor runs at {output} of its {rating} rating."
         : "The fission heat passes to helium flowing through the core, which leaves at {rot}. The plant needs {need} and the reactor is rated at {rating}.",
@@ -104,13 +121,15 @@ const STEPS = [
     nums: {
       rot: ROT,
       ihx: N("balances.energy.ihx_duty.value", "MW", 1, "live", "IHX duty"),
-      he: N("units.circ_primary.inputs.he_prim.value", "kg/s", 1, "live", "Primary helium flow"),
+      he: N("units.circ_primary.inputs.he_prim.value", "kg/s", 1, "live", "Primary helium flow at the need"),
       e: N("units.circ_primary.results.e_prim.value", "MWe", 2, "live", "Primary circulator"),
       app: N("units.ihx.conditions.IHX_APPROACH_K.value", "K", 0, "input", "IHX approach"),
     },
     figs: ["ihx", "he", "e", "app"],
-    text: () => [
-      "Hot primary helium at {rot} passes {ihx} to a separate secondary loop in the intermediate heat exchanger (IHX), so the reactor coolant never enters the chemical plant.",
+    text: (c) => [
+      heatShort(c)
+        ? "At the need, hot primary helium at {rot} would pass {ihx} to a separate secondary loop in the intermediate heat exchanger (IHX), which keeps the reactor coolant out of the chemical plant. The rated reactor cannot supply all of the plant's heat, as the warning above says."
+        : "Hot primary helium at {rot} passes {ihx} to a separate secondary loop in the intermediate heat exchanger (IHX), so the reactor coolant never enters the chemical plant.",
       "The circulator sends the cooled helium back to the core.",
     ],
     notes: (c) => ["A branch of the hot helium also runs to the power block, which step 12 follows.", c.flag("ihx_approach_k")],
@@ -127,13 +146,15 @@ const STEPS = [
     nums: {
       sup: T_SUP,
       ret: N("units.smr.conditions.T_HE_RETURN.value", "C", 0, "fixed", "Helium return"),
-      q: N("kpi.q_process_mwth", "MWth", 1, "live", "Process heat"),
+      q: N("kpi.q_process_mwth", "MWth", 1, "live", "Process heat, with feed preheat"),
       he: N("units.circ_primary.inputs.he_sec.value", "kg/s", 1, "live", "Secondary helium flow"),
       e: N("units.circ_primary.results.e_sec.value", "MWe", 2, "live", "Secondary circulator"),
     },
     figs: ["sup", "ret", "q", "he"],
-    text: () => [
-      "The secondary helium leaves the IHX at {sup}, heats the reformer tubes and returns at {ret}, bringing {q} of process heat that a conventional reformer would raise by burning natural gas.",
+    text: (c) => [
+      heatShort(c)
+        ? "The secondary helium leaves the IHX at {sup}, heats the reformer and its feed preheat, and returns at {ret}. At the need it would bring {q} of process heat, which a conventional reformer raises by burning natural gas."
+        : "The secondary helium leaves the IHX at {sup}, heats the reformer and its feed preheat, and returns at {ret}. It brings {q} of process heat that a conventional reformer would raise by burning natural gas.",
       "A second circulator on the return leg draws {e}; the drawing does not show it.",
     ],
     notes: (c) => [
@@ -154,14 +175,13 @@ const STEPS = [
       ng: N("kpi.ng_mmscfd", "MMSCFD", 1, "live", "Natural gas feed"),
       out: N("units.smr.conditions.SYNGAS_CHAIN_C5_HPS_GEN1_T_IN_C.value", "C", 0, "fixed", "Reformer exit, INL assumption"),
       sup: T_SUP,
-      tube: R("tube_exit", "C", 1, "Exit reachable on the assumed tube"),
     },
-    figs: ["ng", "out", "tube"],
+    figs: ["ng", "out", "sup"],
     text: (c) => [
-      `Natural gas at {ng} and process steam enter the reformer${c.q(RECYCLED.p) > 0 ? ", joined by the methane-rich recycle of step 9" : ""}. In the catalyst tubes methane and steam react to hydrogen and carbon monoxide, taking up the helium's heat.`,
+      `Natural gas at {ng} and process steam enter the reformer${recycles(c) ? ", joined by the methane-rich recycle of step 9" : ""}. In the catalyst tubes methane and steam react to hydrogen and carbon monoxide, taking up the helium's heat.`,
       c.x.basis === "case_a"
-        ? "The engine sets the exit at {out}, INL's equilibrium assumption; the tube check that tests it ran on the Case B feed."
-        : "The engine sets the exit at {out}, INL's equilibrium assumption; with helium at {sup}, the tube model reaches only {tube} on the assumed tube.",
+        ? "The engine sets the exit at {out}, the equilibrium assumption of the Idaho National Laboratory (INL) study; the tube check that tests it ran on the Case B feed."
+        : "The engine sets the exit at {out}, the equilibrium assumption of the Idaho National Laboratory (INL) study. With helium supplied at {sup}, the engine's tube model found no tube count in its search range that reaches it on the assumed tube, so the exit stays an assumption.",
     ],
   },
   {
@@ -202,9 +222,11 @@ const STEPS = [
       sep: N("units.separator.conditions.SYNGAS_CHAIN_C5_KO_DRM_1_T_OUT_C.value", "C", 0, "fixed", "Separator temperature"),
       cond: N("units.separator.results.condensate.value", "t/h", 0, "live", "Condensate"),
     },
-    figs: ["ex4", "sep", "cond"],
+    figs: (c) => (hasReboiler(c) ? ["ex4", "sep", "cond"] : ["sep", "cond"]),
     text: (c) => [
-      "The shifted gas is cooled in steps, and {ex4} of its heat is hot enough to help drive the MEA reboiler of step 10.",
+      hasReboiler(c)
+        ? "The shifted gas is cooled in steps, and {ex4} of its heat is hot enough to help drive the reboiler of the monoethanolamine (MEA) capture plant in step 10."
+        : "The shifted gas is cooled in steps on its way to capture.",
       c.q("units.separator.results.condensate.value") !== null
         ? "In the separator at {sep}, {cond} of water condenses out before the gas goes on to the absorber."
         : "In the separator at {sep} the condensed water drains out before the gas goes on to the absorber.",
@@ -213,7 +235,7 @@ const STEPS = [
   },
   {
     id: "absorber",
-    title: "CO₂ capture in the MEA absorber",
+    title: (c) => (selexol(c) ? "CO₂ capture by Selexol" : "CO₂ capture in the MEA absorber"),
     ms: 7000,
     units: ["absorber"],
     marks: ["lean", "rich"],
@@ -229,8 +251,8 @@ const STEPS = [
       sol: N("kpi.solvent_t_h", "t/h", 0, "live", "Lean solvent"),
     },
     figs: (c) => (c.x.tail_gas === "inl_selexol" ? ["pp", "cap"] : ["pp", "cap", "sol", "p"]),
-    text: (c) => (c.x.tail_gas === "inl_selexol"
-      ? ["In this scenario a physical solvent, Selexol, takes up {pp} of the CO₂ in one pass, {cap}. The drawing still shows the MEA plant, so its solvent lines stand in for the Selexol unit."]
+    text: (c) => (selexol(c)
+      ? ["In this scenario a physical solvent, Selexol, takes up {pp} of the CO₂ in one pass, {cap}. The drawing still shows the monoethanolamine (MEA) plant, so its solvent lines stand in for the Selexol unit."]
       : [
         "In the packed absorber the gas rises against falling {w} aqueous monoethanolamine (MEA) at {p}.",
         "The amine takes up {pp} of the CO₂ in one pass and leaves at the bottom as rich solvent; the hydrogen-rich gas leaves at the top.",
@@ -262,11 +284,11 @@ const STEPS = [
   },
   {
     id: "reject",
-    title: "PSA reject back to the cryogenic unit",
+    title: (c) => (exported(c) ? "PSA reject exported" : burned(c) ? "PSA reject burned on site" : "PSA reject back to the cryogenic unit"),
     ms: 8000,
-    units: ["recycle_compressor", "cryogenic"],
-    marks: (c) => (rejectLeaves(c) ? [] : ["stack", "rej", "recycle", "h2ret"]),
-    flows: (c) => (rejectLeaves(c) ? [] : [
+    units: (c) => (rejectLeaves(c) ? ["psa"] : ["recycle_compressor", "cryogenic"]),
+    marks: (c) => (exported(c) ? ["boundary"] : burned(c) ? ["stack", "rej"] : ["stack", "rej", "recycle", "h2ret"]),
+    flows: (c) => (exported(c) ? [] : burned(c) ? [["S14"], ["S16"]] : [
       ["S14"],
       ["R1"],
       ["S21", "S03", "S15",
@@ -275,8 +297,8 @@ const STEPS = [
       ["S16"],
     ]),
     ctx: (c) => (rejectLeaves(c) ? [] : ["S12", "S01"]),
-    lead: "cryogenic",
-    ctxUnits: (c) => (rejectLeaves(c) ? ["psa"] : ["psa", "smr"]),
+    lead: (c) => (rejectLeaves(c) ? "psa" : "cryogenic"),
+    ctxUnits: (c) => (rejectLeaves(c) ? [] : ["psa", "smr"]),
     nums: {
       h2: N("units.psa.results.h2_reject.value", "kg/h", 0, "live", "H₂ in the reject"),
       tc: N("units.cryogenic.inputs.tailgas_c.value", "kmol/h", 0, "live", "Carbon in the reject"),
@@ -287,16 +309,16 @@ const STEPS = [
     },
     figs: ["tc", "rc", "bc", "atm"],
     text: (c) => {
-      if (c.x.tail_gas === "export") {
+      if (exported(c)) {
         return [
           "In this scenario the PSA reject, holding {h2} of hydrogen, is exported across the boundary, so the drawn recycle and stack carry nothing.",
           "The engine counts {atm} of CO₂ to the atmosphere.",
         ];
       }
-      if (c.x.tail_gas === "burn_on_site") {
+      if (burned(c)) {
         return [
-          "In this scenario the PSA reject, holding {h2} of hydrogen, is burned on site and gives the reboiler {tail}; the drawn recycle carries nothing.",
-          "The engine counts {atm} of CO₂ to the atmosphere.",
+          "In this scenario the PSA reject, holding {h2} of hydrogen, crosses back into the boundary and is burned on site, which gives the reboiler {tail}; the drawn cryogenic unit and recycle carry nothing.",
+          "The flue gas leaves by the stack, and the engine counts {atm} of CO₂ to the atmosphere.",
         ];
       }
       return [
@@ -304,7 +326,15 @@ const STEPS = [
         "The cold separation returns hydrogen to the PSA feed and a methane-rich recycle to the reformer. The nitrogen-rich cut is burned and leaves by the stack as the plant's residual {atm} of CO₂.",
       ];
     },
-    notes: (c) => [c.limit("cryogenic", 1), "The burner of the nitrogen-rich cut is not drawn; the stack stands for it."],
+    notes: (c) => {
+      if (exported(c)) return ["No line on the drawing shows the export."];
+      if (burned(c)) return ["The burner is not drawn. Here the reject goes to it in place of the recycle compressor and the cryogenic unit, and the stack stands for its flue gas."];
+      return [
+        // INL drew the unit for the small CO₂ slip of Selexol, so this limit is MEA's.
+        selexol(c) ? "" : c.limit("cryogenic", 1),
+        "The burner of the nitrogen-rich cut is not drawn; the stack stands for it.",
+      ];
+    },
   },
   {
     id: "stripper",
@@ -312,7 +342,7 @@ const STEPS = [
     ms: 8000,
     units: ["rich_lean_hx", "stripper", "reboiler", "lean_cooler", "lean_pump"],
     marks: ["rich"],
-    flows: (c) => (c.q(Q_REB.p) > 0 ? [["S17"], ["L3"], ["L5", "L6"], ["L4"], ["S18"]] : []),
+    flows: (c) => (hasReboiler(c) ? [["S17"], ["L3"], ["L5", "L6"], ["L4"], ["S18"]] : []),
     lead: "reboiler",
     ctxUnits: ["absorber"],
     nums: {
@@ -325,9 +355,9 @@ const STEPS = [
       tail: TAIL_HEAT,
       gap: N("balances.energy.reactor_steam_to_reboiler.value", "MW", 1, "live", "Reactor steam to the reboiler"),
     },
-    figs: ["q", "srd", "gap", "ps"],
+    figs: (c) => (hasReboiler(c) ? ["q", "srd", "gap", "ps"] : ["q"]),
     text: (c) => {
-      if (!(c.q(Q_REB.p) > 0)) {
+      if (!hasReboiler(c)) {
         return ["In this scenario Selexol takes the place of the MEA plant, and the reboiler duty is {q}."];
       }
       const tail = c.q(TAIL_HEAT.p) > 0 ? ", tail gas burned on site {tail}" : "";
@@ -336,28 +366,29 @@ const STEPS = [
         `The reboiler needs {q}, met in a fixed order: freed Selexol steam {sel}, export steam {exp}, syngas heat {ex4}${tail}, and reactor steam {gap} last.`,
       ];
     },
-    notes: () => ["No line on the drawing brings heat into the reboiler; the order comes from the engine's energy balance."],
+    notes: (c) => (hasReboiler(c) ? ["No line on the drawing brings heat into the reboiler; the order comes from the engine's energy balance."] : []),
   },
   {
     id: "co2",
     title: "CO₂ compression, ship and offshore storage",
     ms: 8000,
-    units: ["condenser", "co2_compressor", "co2_storage"],
+    units: (c) => (selexol(c) ? ["co2_compressor", "co2_storage"] : ["condenser", "co2_compressor", "co2_storage"]),
     marks: ["co2"],
-    flows: [["C1"], ["S19"], ["S20"]],
+    flows: (c) => (selexol(c) ? [["S19"], ["S20"]] : [["C1"], ["S19"], ["S20"]]),
     lead: "co2_storage",
-    ctxUnits: ["stripper"],
+    ctxUnits: (c) => (selexol(c) ? [] : ["stripper"]),
     inset: "ship",
     nums: {
-      p: R("s20_p_bar", "bar", 1, "Compressed CO₂ pressure"),
       e: N("units.co2_compressor.results.e_co2.value", "MWe", 2, "live", "Compression"),
       cap: N("kpi.co2_captured_t_y", "t/y", 0, "live", "CO₂ shipped to storage"),
       ts: N("inputs.ts_s_t", "S$/t", 0, "input", "Transport and storage tariff"),
       cost: N("units.co2_storage.results.ts_cost.value", "S$M/y", 1, "live", "Transport and storage charge"),
     },
-    figs: ["cap", "e", "p", "cost"],
-    text: () => [
-      "The condenser returns water from the stripper overhead as reflux, and the CO₂ is compressed to {p} using {e}.",
+    figs: ["cap", "e", "ts", "cost"],
+    text: (c) => [
+      selexol(c)
+        ? "The CO₂ from the Selexol unit, drawn as the line from the condenser, is compressed to INL's pipeline condition using {e}. The model does not include conditioning the CO₂ for the ship; the pipeline compression load stands in for it."
+        : "The condenser returns water from the stripper overhead as reflux, and the CO₂ is compressed to INL's pipeline condition using {e}. The model does not include conditioning the CO₂ for the ship; the pipeline compression load stands in for it.",
       "Then {cap} of CO₂ leaves by ship for storage offshore abroad, which the model treats as a tariff of {ts} with no simulation.",
     ],
     notes: (c) => [c.limit("co2_storage", 1)],
@@ -368,32 +399,45 @@ const STEPS = [
     ms: 7000,
     units: ["power", "circ_primary", "htgr"],
     marks: [],
-    flows: [["P1"], ["P4"]],
+    flows: (c) => (c.q(BRANCH) > 0 ? [["P1"], ["P4"]] : []),
     lead: "power",
     feas: true,
     nums: {
-      br: N("units.power.inputs.branch.value", "MWth", 1, "live", "Helium branch to the power block"),
-      en: N("units.power.outputs.e_nuc.value", "MWe", 1, "live", "Electricity generated"),
+      br: N(BRANCH, "MWth", 1, "live", "Helium branch to the power block"),
+      brn: N(BRANCH, "MWth", 1, "live", "Helium branch at the need"),
+      en: N("units.power.outputs.e_nuc.value", "MWe", 2, "live", "Turbine output at the need"),
+      gen: N("balances.energy.electricity_generation.value", "MWe", 2, "live", "Electricity generated"),
       eta: N("inputs.eta_power", "-", 1, "input", "Conversion efficiency"),
-      gap: N("units.power.results.gap.value", "MW", 1, "live", "Reactor steam to the reboiler"),
+      gap: N("balances.energy.reactor_steam_to_reboiler.value", "MW", 1, "live", "Reactor steam to the reboiler"),
       ec: N("balances.power.e_circ.value", "MWe", 2, "live", "Helium circulators"),
       et: N("units.power.results.e_total.value", "MWe", 2, "live", "Site electricity demand"),
       imp: N("kpi.unmet_power_mwe", "MWe", 2, "live", "Grid import"),
-      tg: R("tail_gas_power", "MWe", 1, "Electricity from tail gas burned on site"),
     },
-    figs: ["br", "en", "et", "imp"],
+    figs: (c) => (c.feasible ? ["br", "gen", "et", "imp"] : ["brn", "gen", "et", "imp"]),
     text: (c) => {
       const last = "The helium circulators draw {ec} of the {et} site demand, and the grid supplies {imp}.";
-      if (c.x.tail_gas === "burn_on_site") {
+      if (burned(c)) {
         return [
-          c.x.basis === "case_a"
-            ? "In this scenario the helium branch carries {br}, the turbine makes {en}, and the site runs on the tail gas burned on site."
-            : "In this scenario the helium branch carries {br}, the turbine makes {en}, and the site runs on the tail gas burned on site, which yields {tg} in the precomputed Case B run.",
+          "In this scenario electricity from the reject burned on site takes the place of the power block, so the helium branch carries {br} and the turbine makes {gen}.",
+          last,
+        ];
+      }
+      if (!c.feasible) {
+        // The branch and the turbine output of the reply are at the need; the
+        // generation at the rated reactor output is a field of its own.
+        return [
+          "At the need, a branch of the hot primary helium would carry {brn} to the power block and its turbine would make {en}. At the reactor's rated output the turbine makes {gen}.",
+          last,
+        ];
+      }
+      if (c.q(STEAM_GAP) > 0) {
+        return [
+          "A branch of the hot primary helium carries {br} to the power block. The steam for the reboiler first does back-pressure work in the turbine and then gives the reboiler {gap}; the rest of the branch drives the turbine at {eta} efficiency, and the two together make {gen}.",
           last,
         ];
       }
       return [
-        "A branch of the hot primary helium carries {br} to the power block, whose turbine makes {en} at {eta} efficiency and sends {gap} of steam heat to the reboiler.",
+        "A branch of the hot primary helium carries {br} to the power block, whose turbine makes {gen} at {eta} efficiency.",
         last,
       ];
     },
@@ -406,7 +450,7 @@ const STEPS = [
     all: true,
     units: [],
     marks: [],
-    flows: (c) => [allStreams().filter((id) => !(rejectLeaves(c) && RECYCLE_LINES.includes(id)))],
+    flows: (c) => [allStreams().filter((id) => !idle(c).includes(id))],
     lead: "htgr",
     feas: true,
     nums: {
@@ -422,8 +466,10 @@ const STEPS = [
     figs: ["h2", "cap", "atm", "ab"],
     text: (c) => [
       "End to end, the plant makes {h2} of purified hydrogen and sends {cap} of CO₂ to storage.",
-      "Against the {base} an unabated reformer would emit on INL's baseline, its residual of {atm} leaves a net abatement of {ab}. Part of that is the CO₂ stored; the rest is never formed, since no natural gas is burned for reformer heat.",
-      `${c.met ? "The abatement target of {tgt} is met at these inputs." : "The abatement target of {tgt} is not met at these inputs."} On Cho's and IEAGHG's baselines the net abatement is {cho} and {ie}.`,
+      `Against the {base} an unabated reformer would emit on INL's baseline, its residual of {atm} leaves a net abatement of {ab}. Part of that is the CO₂ stored; the rest is never formed, because ${recycles(c)
+        ? "reactor heat replaces the reformer's fuel gas and the cryogenic recycle returns methane to the feed"
+        : "reactor heat replaces the reformer's fuel gas"}.`,
+      `${abatementVerdict(c)} On Cho's and IEAGHG's baselines the net abatement is {cho} and {ie}.`,
     ],
     status: (c) => {
       const t = c.r && c.r.targets && c.r.targets.cost;
@@ -434,12 +480,21 @@ const STEPS = [
   },
 ];
 
+/** The engine's abatement verdict in words. Net abatement at or above the
+ * target on an infeasible plant does not count as met. */
+function abatementVerdict(c) {
+  const a = c.r && c.r.targets ? c.r.targets.abatement : null;
+  if (a && a.met) return "The abatement target of {tgt} is met at these inputs.";
+  if (a && a.at_or_above_target && a.feasible === false) {
+    return "The net abatement is at or above the target of {tgt}, but the engine does not count the target as met, since the plant is not feasible at these inputs.";
+  }
+  return "The abatement target of {tgt} is not met at these inputs.";
+}
+
 // ------------------------------------------------------------------ state
 
 let api = null;
 const el = {};
-let rows = null;           // Map of tour row key to row, once data/tour_rows.json loads
-let rowsError = "";
 let mq = null;
 let active = false;
 let idx = 0;
@@ -454,6 +509,8 @@ let prevLive = null;
 
 const n = () => STEPS.length;
 const pick = (v, c) => (typeof v === "function" ? v(c) : v || []);
+const titleOf = (s, c) => (typeof s.title === "function" ? s.title(c) : s.title);
+const leadOf = (s, c) => (typeof s.lead === "function" ? s.lead(c) : s.lead);
 
 function reply() {
   return api ? api.state.lastOk || null : null;
@@ -476,7 +533,6 @@ function context() {
       return typeof v === "number" && Number.isFinite(v) ? v : null;
     },
     feasible: !(r && r.feasibility && r.feasibility.feasible === false),
-    met: Boolean(r && r.targets && r.targets.abatement && r.targets.abatement.met),
     flag: (param) => {
       const f = flags.find((e) => e.param === param);
       return f ? `Input outside its evidence range: ${flagText(f.text)}.` : "";
@@ -502,30 +558,21 @@ function fmtNum(v, u, d) {
   return x.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-function valueOf(spec, c) {
-  if (spec.row) {
-    const r = rows ? rows.get(spec.row) : null;
-    return r && typeof r.value === "number" ? r.value : null;
-  }
-  return c.q(spec.p);
-}
-
-/** One number as HTML; the data attributes let the self test check it against its source. */
-function numHtml(spec, c, inText) {
+/** One number as HTML; the data attributes let the self test check it against
+ * its reply path. A no-break space keeps the unit with its number in the text
+ * that is read aloud or copied; a percentage takes no space. */
+function numHtml(spec, c) {
   if (!spec) return "n/a";
-  const v = valueOf(spec, c);
-  const text = fmtNum(v, spec.u, spec.d);
-  const src = spec.row ? `data-row="${esc(spec.row)}"` : `data-path="${esc(spec.p)}"`;
+  const text = fmtNum(c.q(spec.p), spec.u, spec.d);
   const u = unitText(spec.u);
-  const unit = text === null ? "" : `<span class="tu${u === "%" ? " pct" : ""}">${esc(u)}</span>`;
-  const pre = spec.row && inText && text !== null ? `<span class="tpre"> (precomputed)</span>` : "";
-  return `<b class="tn" ${src} data-u="${esc(spec.u)}" data-d="${spec.d}">${esc(text === null ? "n/a" : text)}</b>${unit}${pre}`;
+  const unit = text === null ? "" : `${u === "%" ? "" : "\u00a0"}<span class="tu">${esc(u)}</span>`;
+  return `<b class="tn" data-path="${esc(spec.p)}" data-u="${esc(spec.u)}" data-d="${spec.d}">${esc(text === null ? "n/a" : text)}</b>${unit}`;
 }
 
 function fill(tpl, s, c) {
   return String(tpl).split(/(\{\w+\})/).map((part) => {
     const m = /^\{(\w+)\}$/.exec(part);
-    return m ? numHtml(s.nums[m[1]], c, true) : esc(part);
+    return m ? numHtml(s.nums[m[1]], c) : esc(part);
   }).join("");
 }
 
@@ -535,11 +582,7 @@ function missingNotes(s, c, keys) {
   const out = [];
   for (const k of keys) {
     const spec = s.nums[k];
-    if (!spec || valueOf(spec, c) !== null) continue;
-    if (spec.row) {
-      out.push(`${spec.l}: n/a, ${rowsError || "the precomputed row is loading"}.`);
-      continue;
-    }
+    if (!spec || c.q(spec.p) !== null) continue;
     const field = spec.p.replace(/\.value$/, "");
     const m = list.find((e) => e.field === field || e.field === spec.p);
     out.push(`${spec.l}: n/a${m ? `, ${m.reason}` : c.r ? "" : ", waiting for the engine"}.`);
@@ -599,7 +642,7 @@ const INSETS = {
   },
   ship: {
     caption: "Illustration. The engine models the ship and the store as a tariff only.",
-    label: "Illustration: a ship carries the compressed CO₂ from the plant to an offshore store, where it goes into a rock formation deep under the seabed.",
+    label: "Illustration: a ship carries the CO₂ from the plant to an offshore store, where it goes into a rock formation deep under the seabed.",
     svg: `<svg viewBox="0 0 340 160" class="ts" aria-hidden="true" focusable="false">
 <rect width="340" height="160" fill="#dfeaf3"/>
 <rect y="84" width="340" height="34" fill="#3f7fb0"/>
@@ -636,7 +679,7 @@ function insetHtml(key) {
 // ------------------------------------------------------------------ the drawing
 
 function clearMarks() {
-  for (const e of el.svg.querySelectorAll(".tour-on, .tour-ctx, .tour-move")) e.classList.remove("tour-on", "tour-ctx", "tour-move");
+  for (const e of el.svg.querySelectorAll(".tour-on, .tour-ctx, .tour-move, .tour-lead")) e.classList.remove("tour-on", "tour-ctx", "tour-move", "tour-lead");
 }
 
 function light(sel, cls) {
@@ -654,7 +697,7 @@ function applyMarks(s, c) {
   svg.classList.toggle("is-still", still);
   svg.classList.toggle("tour-all", Boolean(s.all));
   svg.dataset.tourStep = s.id;
-  for (const id of s.units) light(`[data-unit="${CSS.escape(id)}"]`, "tour-on");
+  for (const id of pick(s.units, c)) light(`[data-unit="${CSS.escape(id)}"]`, "tour-on");
   for (const id of pick(s.ctx, c)) light(`[data-stream="${CSS.escape(id)}"]`, "tour-ctx");
   for (const id of pick(s.ctxUnits, c)) light(`[data-unit="${CSS.escape(id)}"]`, "tour-ctx");
   for (const id of streamIds(pick(s.flows, c))) {
@@ -662,6 +705,8 @@ function applyMarks(s, c) {
     if (!s.all) light(`[data-stream="${CSS.escape(id)}"]`, "tour-move");
   }
   for (const k of pick(s.marks, c)) light(`[data-tour="${CSS.escape(k)}"]`, "tour-on");
+  const lead = leadOf(s, c);
+  if (lead) light(`[data-unit="${CSS.escape(lead)}"]`, "tour-lead");
 }
 
 function mediumOf(g) {
@@ -750,17 +795,16 @@ function renderCard() {
   const s = STEPS[idx];
   const c = context();
   el.kicker.textContent = `Step ${idx + 1} of ${n()}`;
-  el.title.textContent = s.title;
+  el.title.textContent = titleOf(s, c);
   const figs = pick(s.figs, c);
   const eqs = pick(s.eq, c);
   const stale = api.state.result && api.state.result.status === "not_converged";
-  const leadStatus = c.r && c.r.units && c.r.units[s.lead] ? c.r.units[s.lead].status : null;
-  const usesRow = figs.some((k) => s.nums[k] && s.nums[k].row);
+  const lead = leadOf(s, c);
+  const leadStatus = c.r && c.r.units && c.r.units[lead] ? c.r.units[lead].status : null;
 
   const tags = [c.r ? tagHtml("live", "Live engine values") : tagHtml("wait", "Waiting for the engine")];
   if (stale) tags.push(tagHtml("stale", "Last converged result"));
   if (s.inset || eqs.length) tags.push(tagHtml("illustration", "Includes an illustration"));
-  if (usesRow) tags.push(tagHtml("pre", "Some values precomputed"));
   if (leadStatus === "external") tags.push(tagHtml("external", "External block, not simulated"));
 
   const media = [];
@@ -784,7 +828,7 @@ function renderCard() {
   const figHtml = figs.length
     ? `<dl class="tour-figs">${figs.map((k) => {
       const spec = s.nums[k];
-      return `<div data-fig="${esc(k)}"><dt>${esc(spec.l)}</dt><dd>${numHtml(spec, c, false)}<span class="tk" data-kind="${esc(spec.k)}">${esc(KIND[spec.k] || spec.k)}</span></dd></div>`;
+      return `<div data-fig="${esc(k)}"><dt>${esc(spec.l)}</dt><dd>${numHtml(spec, c)}<span class="tk" data-kind="${esc(spec.k)}">${esc(KIND[spec.k] || spec.k)}</span></dd></div>`;
     }).join("")}</dl>`
     : "";
   const textKeys = [];
@@ -801,10 +845,10 @@ function renderCard() {
     `<div class="tour-tags">${tags.join("")}</div>`,
     warn.join(""),
     scen ? `<p class="tour-scen">${esc(scen)}</p>` : "",
-    s.inset ? insetHtml(s.inset) : "",
     mediaHtml,
     `<div class="tour-text">${text}</div>`,
     eqHtml,
+    s.inset ? insetHtml(s.inset) : "",
     figHtml,
     status ? `<p class="tour-status">${esc(status)}</p>` : "",
     notes.length ? `<ul class="tour-notes">${notes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "",
@@ -815,22 +859,28 @@ function renderCard() {
 }
 
 function announce() {
-  const s = STEPS[idx];
   const text = Array.from(el.body.querySelectorAll(".tour-warn, .tour-text p")).map((p) => p.textContent.trim()).join(" ");
-  el.live.textContent = `Step ${idx + 1} of ${n()}. ${s.title}. ${text}`;
+  el.live.textContent = `Step ${idx + 1} of ${n()}. ${el.title.textContent}. ${text}`;
+}
+
+/** The key line under the card, which names only the keys that act now. */
+function keyHint() {
+  if (!el.keys) return;
+  el.keys.textContent = still
+    ? "With focus off the drawing, the Left and Right arrow keys change the step. Escape leaves the tour."
+    : "With focus off the drawing, the Left and Right arrow keys change the step and Space pauses or plays. Escape leaves the tour.";
 }
 
 // ------------------------------------------------------------------ controls
 
 function updateBar() {
-  const s = STEPS[idx];
   el.count.textContent = `Step ${idx + 1} of ${n()}`;
   el.track.setAttribute("aria-valuemin", "1");
   el.track.setAttribute("aria-valuemax", String(n()));
   el.track.setAttribute("aria-valuenow", String(idx + 1));
-  el.track.setAttribute("aria-valuetext", `Step ${idx + 1} of ${n()}: ${s.title}`);
-  el.prev.setAttribute("aria-disabled", String(idx === 0));
-  el.next.setAttribute("aria-disabled", String(idx === n() - 1));
+  el.track.setAttribute("aria-valuetext", `Step ${idx + 1} of ${n()}: ${el.title.textContent}`);
+  for (const b of el.prevs) b.setAttribute("aria-disabled", String(idx === 0));
+  for (const b of el.nexts) b.setAttribute("aria-disabled", String(idx === n() - 1));
   el.play.hidden = still;
   const word = playing ? "Pause" : ended ? "Replay" : "Play";
   el.play.querySelector("span").textContent = word;
@@ -872,7 +922,18 @@ function armTimer() {
   if (!playing) stepAnim.pause();
 }
 
-function go(i) {
+/** Keep the head of the caption card in view when the step changes: the side
+ * column goes back to its top, and when the card head sits above the window,
+ * the page scrolls up to it. A card below the window is left there, since the
+ * reader is then looking at the drawing. */
+function keepCard() {
+  const side = el.card.parentElement;
+  if (side && side.scrollTop > 0) side.scrollTop = 0;
+  const top = el.card.getBoundingClientRect().top;
+  if (top < 0) window.scrollBy({ top: top - 8, behavior: still ? "auto" : "smooth" });
+}
+
+function go(i, first) {
   if (!active) return;
   idx = Math.max(0, Math.min(n() - 1, i));
   ended = false;
@@ -880,12 +941,14 @@ function go(i) {
   const c = context();
   applyMarks(s, c);
   buildFlows(s, c);
-  if (s.lead && api.select) api.select(s.lead);
+  const lead = leadOf(s, c);
+  if (lead && api.select) api.select(lead);
   renderCard();
   updateBar();
   armTimer();
   announce();
   frame();
+  if (!first) keepCard();
 }
 
 function pause() {
@@ -934,11 +997,31 @@ export function startTour(opts = {}) {
   if (el.route) el.route.classList.add("is-touring");
   el.bar.classList.toggle("is-still", still);
   el.track.style.setProperty("--n", String(n()));
-  go(typeof opts.step === "number" ? opts.step : 0);
-  el.title.focus({ preventScroll: true });
-  const top = el.bar.getBoundingClientRect().top;
-  if (top < 0 || top > window.innerHeight * 0.4) el.bar.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+  keyHint();
+  go(typeof opts.step === "number" ? opts.step : 0, true);
+  placeStart();
   return true;
+}
+
+/** After Start: bring the tour near the top of the window and move focus.
+ * With the card in the side column the anchor is the top of the layout, which
+ * the card shares; with the card under the drawing it is the bar. The page
+ * scrolls when the anchor is above the window or low in it, or when that
+ * brings an unseen step title into view. Focus goes to the step title when it
+ * will be fully in view, or else to the first control of the bar. */
+function placeStart() {
+  const bar = el.bar.getBoundingClientRect();
+  const side = el.card.getBoundingClientRect().top < bar.top;
+  const anchor = side ? el.bar.closest(".pfd-layout") || el.bar : el.bar;
+  const top = anchor.getBoundingClientRect().top;
+  const t = el.title.getBoundingClientRect();
+  const fits = (dy) => t.top - dy >= 0 && t.bottom - dy <= window.innerHeight;
+  const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  const lift = Math.max(0, Math.min(max, window.scrollY + top - 8)) - window.scrollY;
+  const dy = top < 0 || top > window.innerHeight * 0.4 || (!fits(0) && fits(lift)) ? lift : 0;
+  if (dy) window.scrollTo({ top: window.scrollY + dy, behavior: still ? "auto" : "smooth" });
+  const target = fits(dy) ? el.title : still ? el.nexts[0] : el.play;
+  target.focus({ preventScroll: true });
 }
 
 /** Leave the tour; with focusStart, focus goes back to the start button. */
@@ -982,6 +1065,7 @@ export function refreshTour() {
   applyMarks(s, c);
   buildFlows(s, c);
   renderCard();
+  updateBar();
 }
 
 function onBar(e) {
@@ -1021,19 +1105,6 @@ function onEscape(e) {
   exitTour(true);
 }
 
-async function loadRows() {
-  try {
-    const res = await fetch(new URL("data/tour_rows.json?v=__COMMIT__", import.meta.url));
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    rows = new Map(Object.entries(data.rows || {}));
-  } catch (err) {
-    rows = new Map();
-    rowsError = `data/tour_rows.json did not load (${err && err.message ? err.message : err})`;
-  }
-  refreshTour();
-}
-
 function startNote() {
   const total = STEPS.reduce((a, s) => a + s.ms, 0);
   const minutes = Math.round(total / 30000) / 2;
@@ -1059,9 +1130,13 @@ export function initTour(a) {
   el.track = document.getElementById("tour-track");
   el.fill = document.getElementById("tour-fill");
   el.route = document.getElementById("route-pfd");
+  el.keys = document.getElementById("tour-keys");
+  el.pick = document.getElementById("pfd-select");
   if (!el.start || !el.bar || !el.card || !el.svg) return;
-  el.prev = el.bar.querySelector('[data-act="prev"]');
-  el.next = el.bar.querySelector('[data-act="next"]');
+  // Previous and Next sit in the bar above the drawing and again under the
+  // card, so a keyboard reader on the card need not cross the drawing.
+  el.prevs = Array.from(document.querySelectorAll('#tour-bar [data-act="prev"], #tour-card [data-act="prev"]'));
+  el.nexts = Array.from(document.querySelectorAll('#tour-bar [data-act="next"], #tour-card [data-act="next"]'));
   el.play = el.bar.querySelector('[data-act="play"]');
   el.flows = document.createElementNS("http://www.w3.org/2000/svg", "g");
   el.flows.setAttribute("class", "tour-flows");
@@ -1076,15 +1151,22 @@ export function initTour(a) {
   }
   el.start.addEventListener("click", () => startTour());
   el.bar.addEventListener("click", onBar);
+  el.card.addEventListener("click", onBar);
   document.addEventListener("keydown", onKey);
   document.addEventListener("keydown", onEscape, true);
-  // Reading the drawing pauses the tour, so a panel opened by a click stays put.
+  // Reading the drawing pauses the tour, so a panel the reader opens stays put
+  // until they move on: a click, Enter or Space on a unit or stream, or a
+  // choice from the unit list.
   el.svg.addEventListener("click", () => { if (active && playing) pause(); }, true);
+  el.svg.addEventListener("keydown", (e) => {
+    if (!active || !playing || !(e.key === "Enter" || e.key === " " || e.key === "Spacebar")) return;
+    if (e.target && e.target.closest && e.target.closest("[data-unit], [data-stream]")) pause();
+  }, true);
+  if (el.pick) el.pick.addEventListener("change", () => { if (active && playing) pause(); });
   window.addEventListener("hashchange", () => { if (active && location.hash !== "#pfd") exitTour(false); });
   startNote();
   el.start.hidden = false;
   el.note.hidden = false;
-  loadRows();
 }
 
 // ------------------------------------------------------------------ self test
@@ -1092,29 +1174,33 @@ export function initTour(a) {
 /** Ids, keys and reply paths the steps name, checked against the page and a reply. */
 export function tourAudit(res) {
   const svg = el.svg;
-  const missingUnits = [];
-  const missingStreams = [];
-  const missingMarks = [];
+  const miss = { units: new Set(), streams: new Set(), marks: new Set(), keys: new Set() };
   const badPaths = [];
-  const missingRows = [];
-  const badKeys = [];
-  const listed =new Set(((res && res.engine_fields_missing) || []).map((m) => m.field));
-  const c = { x: (res && res.inputs) || {}, q: () => 1, r: res, flag: () => "", limit: () => "", feasible: true, met: true };
-  for (const s of STEPS) {
-    for (const id of [...s.units, ...pick(s.ctxUnits, c), s.lead]) {
-      if (!svg || !svg.querySelector(`[data-unit="${CSS.escape(id)}"]`)) missingUnits.push(`${s.id}:${id}`);
-    }
-    for (const id of [...streamIds(pick(s.flows, c)), ...pick(s.ctx, c)]) {
-      if (!svg || !svg.querySelector(`.pfd-streams > [data-stream="${CSS.escape(id)}"]`)) missingStreams.push(`${s.id}:${id}`);
-    }
-    for (const k of pick(s.marks, c)) if (!svg || !svg.querySelector(`[data-tour="${CSS.escape(k)}"]`)) missingMarks.push(`${s.id}:${k}`);
-    for (const t of pick(s.text, c)) for (const m of String(t).matchAll(/\{(\w+)\}/g)) if (!s.nums[m[1]]) badKeys.push(`${s.id}:${m[1]}`);
-    for (const k of pick(s.figs, c)) if (!s.nums[k]) badKeys.push(`${s.id}:figure ${k}`);
-    for (const [k, spec] of Object.entries(s.nums)) {
-      if (spec.row) {
-        if (!rows || !rows.has(spec.row)) missingRows.push(`${s.id}.${k}:${spec.row}`);
-        continue;
+  const listed = new Set(((res && res.engine_fields_missing) || []).map((m) => m.field));
+  // Every branch of the steps: each reject route, a zero and a non-zero value
+  // for every field a branch reads, and a feasible and an infeasible plant.
+  const contexts = [];
+  for (const tail of ["recycle", "export", "burn_on_site", "inl_selexol"]) {
+    for (const v of [0, 1]) {
+      for (const feasible of [true, false]) {
+        contexts.push({ x: { ...((res && res.inputs) || {}), tail_gas: tail }, q: () => v, r: res, flag: () => "", limit: () => "", feasible });
       }
+    }
+  }
+  for (const s of STEPS) {
+    for (const c of contexts) {
+      for (const id of [...pick(s.units, c), ...pick(s.ctxUnits, c), leadOf(s, c)]) {
+        if (!svg || !svg.querySelector(`[data-unit="${CSS.escape(id)}"]`)) miss.units.add(`${s.id}:${id}`);
+      }
+      for (const id of [...streamIds(pick(s.flows, c)), ...pick(s.ctx, c)]) {
+        if (!svg || !svg.querySelector(`.pfd-streams > [data-stream="${CSS.escape(id)}"]`)) miss.streams.add(`${s.id}:${id}`);
+      }
+      for (const k of pick(s.marks, c)) if (!svg || !svg.querySelector(`[data-tour="${CSS.escape(k)}"]`)) miss.marks.add(`${s.id}:${k}`);
+      for (const t of pick(s.text, c)) for (const m of String(t).matchAll(/\{(\w+)\}/g)) if (!s.nums[m[1]]) miss.keys.add(`${s.id}:${m[1]}`);
+      for (const k of pick(s.figs, c)) if (!s.nums[k]) miss.keys.add(`${s.id}:figure ${k}`);
+      if (!titleOf(s, c)) miss.keys.add(`${s.id}:title`);
+    }
+    for (const [k, spec] of Object.entries(s.nums)) {
       const v = res ? walk(res, spec.p) : undefined;
       const field = spec.p.replace(/\.value$/, "");
       if (typeof v === "number" && Number.isFinite(v)) continue;
@@ -1124,13 +1210,13 @@ export function tourAudit(res) {
   }
   return {
     steps: STEPS.length,
-    ready: Boolean(rows),
-    missing_units: missingUnits,
-    missing_streams: missingStreams,
-    missing_marks: missingMarks,
+    ids: STEPS.map((s) => s.id),
+    branches: contexts.length,
+    missing_units: [...miss.units],
+    missing_streams: [...miss.streams],
+    missing_marks: [...miss.marks],
     bad_paths: badPaths,
-    missing_rows: missingRows,
-    bad_keys: badKeys,
+    bad_keys: [...miss.keys],
     dwell_ms: STEPS.map((s) => s.ms),
     total_ms: STEPS.reduce((a, s) => a + s.ms, 0),
   };
@@ -1140,7 +1226,7 @@ export function tourAudit(res) {
 export function tourState() {
   const c = api ? context() : null;
   return {
-    ready: Boolean(api && rows && el.start && !el.start.hidden),
+    ready: Boolean(api && el.start && !el.start.hidden),
     active,
     step: idx,
     id: STEPS[idx].id,

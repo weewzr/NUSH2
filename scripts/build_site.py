@@ -14,10 +14,8 @@ Steps:
  4. Write data/*.json built from results/*.csv and copy the CSVs to data/csv/.
     Every number in the JSON is read from a CSV cell; nothing is computed here
     beyond counting rows. data/reference.json also carries the MATURE_60Y
-    scenario (its inputs and published rows), data/streams.json the streams
-    of the headline flowsheet run, which the drawing tags by stream id, and
-    data/tour_rows.json the few results cells the process tour prints where
-    the live reply has no field.
+    scenario (its inputs and published rows) and data/streams.json the streams
+    of the headline flowsheet run, which the drawing tags by stream id.
  5. Replace __COMMIT__ in HTML, JS, CSS and SVG files. The frontend uses it as a
     ?v= stamp on every local resource, so a new commit never meets a cached
     file of the old one.
@@ -115,15 +113,6 @@ KPI_CELLS = [
 KPI_UNMAPPED = {
     "h2_rich_kmol_h": "Final_Design_Basis.csv prints the PSA H2 feed in kg/h only",
 }
-# Results rows the process tour prints where the live reply has no field, as
-# key, file, row match, column and unit. frontend/tour.js names the same keys
-# and marks each value as precomputed on screen.
-TOUR_ROWS = [
-    ("tube_exit", FDB, {"id": "TUBE_EXIT_C_N199"}, "case_b", "C"),
-    ("s20_p_bar", IMB, {"run_id": FS_RUN, "stream_id": "S20"}, "p_bar", "bar"),
-    ("tail_gas_power", IEB, {"run_id": "B_COMB_H", "term_id": "TAIL_GAS_POWER"}, "value_mw", "MWe"),
-]
-TOUR_LABEL = {FDB: "parameter", IMB: "stream_name", IEB: "term"}
 # The MATURE_60Y scenario. Its inputs are read from the note and the printed
 # gas price row of Sensitivity_Results.csv, never typed here; the STEPDOWN rows
 # must name the same stage, life and gas price, or the build fails.
@@ -403,17 +392,6 @@ def reference(tables):
     }
 
 
-def tour_rows(tables):
-    """The results cells the process tour prints, each read from one CSV row."""
-    out = {}
-    for key, name, match, col, unit in TOUR_ROWS:
-        _, rows = tables[name]
-        r = find(rows, match, f"tour row {key} in {name}")
-        out[key] = {"value": as_num(r[col], f"tour row {key}"), "unit": unit, "label": r[TOUR_LABEL[name]],
-                    "file": name, "row": match, "column": col}
-    return {"schema": 1, "rows": out}
-
-
 def provenance(tables, files, commit, run_id):
     _, fdb = tables[FDB]
 
@@ -607,7 +585,6 @@ def build(args):
                validation(tables["Validation_Results.csv"][1], meta("Validation_Results.csv"), args.test_log))
     write_json(out / "data" / "reference.json", reference(tables))
     write_json(out / "data" / "streams.json", streams(tables, meta(IMB)))
-    write_json(out / "data" / "tour_rows.json", tour_rows(tables))
     write_json(out / "data" / "provenance.json", provenance(tables, listing, commit, run_id))
 
     for p in out.rglob("*"):

@@ -529,16 +529,60 @@ function shownAs(v, unit, d) {
   return (unit === "-" ? v * 100 : v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-/** Every number in the caption card against its reply field or results row. */
-function captionNumbers(rows) {
+/** Every number in the caption card against its reply field. */
+function captionNumbers() {
   const out = { count: 0, bad: [] };
   for (const b of document.querySelectorAll("#tour-card .tn")) {
     out.count += 1;
-    const v = b.dataset.path ? resolvePath(state.lastOk, b.dataset.path) : (rows[b.dataset.row] || {}).value;
-    const want = shownAs(v, b.dataset.u, Number(b.dataset.d));
-    if (b.textContent !== want) out.bad.push(`${b.dataset.path || b.dataset.row} shows ${b.textContent}, source ${want}`);
+    const want = b.dataset.path ? shownAs(resolvePath(state.lastOk, b.dataset.path), b.dataset.u, Number(b.dataset.d)) : "a reply path";
+    if (b.textContent !== want) out.bad.push(`${b.dataset.path || "a number with no reply path"} shows ${b.textContent}, source ${want}`);
   }
   return out;
+}
+
+/** The reply value behind a caption number of the step text, by its path. */
+function textValue(path) {
+  const b = document.querySelector(`#tour-card .tour-text .tn[data-path="${path}"]`);
+  return b ? resolvePath(state.lastOk, path) : undefined;
+}
+
+/** Step 12 against the electricity balance of the reply: the text prints the
+ * generation at the reactor output, and generation plus grid import never
+ * exceeds the site demand; an infeasible plant reads its branch at the need. */
+function powerStepOk(res) {
+  const gen = textValue("balances.energy.electricity_generation.value");
+  const imp = textValue("kpi.unmet_power_mwe");
+  const dem = textValue("units.power.results.e_total.value");
+  const text = document.querySelector("#tour-card .tour-text").textContent;
+  const sums = [gen, imp, dem].every((v) => typeof v === "number") && gen + imp <= dem * (1 + 1e-9) + 1e-9;
+  const need = res.feasibility.feasible !== false || /at the need/i.test(text);
+  return { ok: sums && need, text: `generation ${gen}, import ${imp}, demand ${dem}, need wording ${need}` };
+}
+
+/** The abatement sentence step 13 must carry for this reply. */
+function abatementPhrase(a) {
+  if (a.met) return "is met at these inputs";
+  if (a.at_or_above_target && a.feasible === false) return "does not count the target as met";
+  return "is not met at these inputs";
+}
+
+/** Wait until a smooth page scroll has come to rest. */
+async function settle() {
+  let y = window.scrollY;
+  let still = 0;
+  for (let i = 0; i < 40 && still < 3; i += 1) {
+    await sleep(60);
+    still = window.scrollY === y ? still + 1 : 0;
+    y = window.scrollY;
+  }
+}
+
+/** The focused element lies fully inside the window. */
+function focusInView() {
+  const a = document.activeElement;
+  if (!a || a === document.body) return false;
+  const r = a.getBoundingClientRect();
+  return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0;
 }
 
 const press = (key) => (document.activeElement || document.body)
@@ -552,10 +596,8 @@ async function tourChecks(add) {
   location.hash = "#pfd";
   await sleep(ROUTE_WAIT_MS);
   let tour;
-  let rows = {};
   try {
     tour = await import("./tour.js?v=__COMMIT__");
-    rows = ((await (ok(await fetch("data/tour_rows.json?v=__COMMIT__", NO_STORE))).json()).rows) || {};
   } catch (e) {
     add("tour_steps_bound", false, `the tour did not load: ${e && e.message ? e.message : e}`);
     return;
@@ -563,9 +605,9 @@ async function tourChecks(add) {
   await pageSolve(null, true);
   const ready = await until(() => tour.tourState().ready, LOAD_MS);
   const a = tour.tourAudit(state.lastOk);
-  const unbound = [...a.missing_units, ...a.missing_streams, ...a.missing_marks, ...a.bad_paths, ...a.missing_rows, ...a.bad_keys];
+  const unbound = [...a.missing_units, ...a.missing_streams, ...a.missing_marks, ...a.bad_paths, ...a.bad_keys];
   add("tour_steps_bound", Boolean(ready) && a.steps > 0 && unbound.length === 0,
-    `${a.steps} steps; every unit, stream, label key, reply path and results row they name resolves${unbound.length ? `; unbound: ${unbound.join(", ")}` : ""}`);
+    `${a.steps} steps over ${a.branches} scenario branches; every unit, stream, label key, text key and reply path they name resolves${unbound.length ? `; unbound: ${unbound.join(", ")}` : ""}`);
 
   const n = a.steps;
   const reducedOS = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -576,12 +618,17 @@ async function tourChecks(add) {
 
   // Start from the button, step through with Next, leave with Exit.
   const texts = [];
+  const spoken = [];
   try {
     const errs0 = errors.length;
     start.click();
     await until(() => tour.tourState().active, 2000);
+    await settle();
     const st0 = tour.tourState();
-    const focusTitle = document.activeElement === title;
+    // Focus goes to the step title, or to a bar control when the title would
+    // sit outside the window; either way the focused element is in view.
+    const focusTitle = (document.activeElement === title || bar.contains(document.activeElement)) && focusInView();
+    const focusOn = document.activeElement === title ? "the step title" : "a bar control";
     const visited = [];
     const numBad = [];
     const motion = [];
@@ -592,7 +639,8 @@ async function tourChecks(add) {
       const st = tour.tourState();
       visited.push(st.step + 1);
       texts.push(document.getElementById("tour-card").textContent);
-      const nums = captionNumbers(rows);
+      spoken.push(document.querySelector("#tour-card .tour-text").textContent);
+      const nums = captionNumbers();
       numCount += nums.count;
       numBad.push(...nums.bad.map((x) => `step ${st.step + 1}: ${x}`));
       if (!document.querySelector("#pfd-svg .tour-on")) unlit.push(st.step + 1);
@@ -611,7 +659,7 @@ async function tourChecks(add) {
     const inOrder = visited.length === n && visited.every((v, k) => v === k + 1);
     const fails = [
       st0.active ? "" : "did not start",
-      focusTitle ? "" : "focus did not move to the step title",
+      focusTitle ? "" : "focus did not move to the step title or a bar control in view",
       st0.playing === !reducedOS ? "" : `playing ${st0.playing} with reduced motion ${reducedOS}`,
       inOrder ? "" : `visited ${visited.join(" ")}`,
       last.step === n - 1 && endDisabled ? "" : "the last step does not end the walk",
@@ -621,9 +669,9 @@ async function tourChecks(add) {
       newErrors.length ? `${newErrors.length} error(s): ${newErrors.slice(0, 3).join(" | ")}` : "",
     ].filter(Boolean);
     add("tour_plays", fails.length === 0,
-      `started from its button, ${visited.length} of ${n} steps visited in order, ${reducedOS ? "reduced motion" : "dashes moving on every step with flows"}, exited with focus on the start button${fails.length ? `; ${fails.join("; ")}` : ""}`);
+      `started from its button with focus on ${focusOn} in view, ${visited.length} of ${n} steps visited in order, ${reducedOS ? "reduced motion" : "dashes moving on every step with flows"}, exited with focus on the start button${fails.length ? `; ${fails.join("; ")}` : ""}`);
     add("tour_numbers_live", numCount > 0 && numBad.length === 0,
-      `${numCount} caption numbers over ${n} steps at the default inputs, each equal to its reply field or results row${numBad.length ? `; ${numBad.length} differ: ${numBad.slice(0, 6).join("; ")}` : ""}`);
+      `${numCount} caption numbers over ${n} steps at the default inputs, each equal to its reply field${numBad.length ? `; ${numBad.length} differ: ${numBad.slice(0, 6).join("; ")}` : ""}`);
   } catch (e) {
     add("tour_plays", false, String(e && e.message ? e.message : e));
   }
@@ -635,8 +683,11 @@ async function tourChecks(add) {
   if (all.includes(String.fromCharCode(0x2014))) hits.push("emdash");
   if (/\bSMR\b/.test(all)) hits.push("bare SMR");
   if (/\{\w*\}/.test(all)) hits.push("placeholder");
+  // A number runs into its unit in the text that is read aloud or copied.
+  const glued = spoken.join(" ").match(/[0-9][A-Za-z°$]\S*/g) || [];
+  if (glued.length) hits.push(`number joined to its unit: ${glued.slice(0, 4).join(", ")}`);
   add("tour_text_rules", texts.length === n && hits.length === 0,
-    `${all.length} characters over ${texts.length} steps${hits.length ? `; rules hit: ${hits.join(", ")}` : ""}`);
+    `${all.length} characters over ${texts.length} steps${hits.length ? `; rules hit: ${hits.join(", ")}` : ", every number spaced from its unit"}`);
 
   // Keys: arrows step, Space pauses, Escape closes an open stream tip first
   // and then the tour, with focus back on the start button.
@@ -664,7 +715,7 @@ async function tourChecks(add) {
     const tipFirst = tip.hidden && tour.tourState().active;
     press("Escape");
     const out = !tour.tourState().active && document.activeElement === start;
-    const buttons = [start, ...bar.querySelectorAll("[data-act]")].every((b) => b.tagName === "BUTTON" && b.type === "button");
+    const buttons = [start, ...bar.querySelectorAll("[data-act]"), ...document.querySelectorAll("#tour-card [data-act]")].every((b) => b.tagName === "BUTTON" && b.type === "button");
     add("tour_keyboard", s1 === 1 && s0 === 0 && spaceOk && tipOpen && tipFirst && out && buttons,
       `ArrowRight to step ${s1 + 1}, ArrowLeft to step ${s0 + 1}, Space ${reducedOS ? "no play under reduced motion" : `playing ${p0} then ${p1} then ${p2}`}, Escape closed the stream tip first ${tipFirst}, then the tour with focus on the start button ${out}, every control a button ${buttons}`);
   } catch (e) {
@@ -724,28 +775,47 @@ async function tourChecks(add) {
     add("tour_autoplay", false, String(e && e.message ? e.message : e));
   }
 
-  // The numbers follow the controls: at a rating below the need the first
-  // step shows the engine's infeasibility reason and the new rating, and the
-  // last step states the abatement verdict the engine gives.
+  // The numbers follow the controls. At a rating below the need, step 1
+  // shows the engine's infeasibility reason and the new rating, steps 2 and 3
+  // read the IHX and process heat at the need, step 12 prints the generation
+  // at the reactor output with generation plus import within the demand, and
+  // step 13 states the abatement verdict the engine gives. Case A, where the
+  // heat fits the rating and the power branch falls short, is checked on
+  // steps 12 and 13 the same way.
   try {
+    const at = async (id) => { tour.goTour(a.ids.indexOf(id)); await sleep(60); return document.querySelector("#tour-card .tour-text").textContent; };
     const res = await pageSolve({ rating_mwth: 100 }, true);
     tour.startTour({ reduced: true, step: 0 });
     await sleep(80);
     const warn = document.querySelector("#tour-card .tour-warn");
     const warnOk = Boolean(res && res.feasibility && res.feasibility.feasible === false && warn && warn.textContent.includes(res.feasibility.reason));
-    const n1 = captionNumbers(rows);
+    const bad = [...captionNumbers().bad];
+    let count = captionNumbers().count;
     const rating = document.querySelector('#tour-card .tn[data-path="kpi.rating_mwth"]');
     const ratingOk = Boolean(rating && rating.textContent === shownAs(resolvePath(res, "kpi.rating_mwth"), "MWth", 0));
-    tour.goTour(n - 1);
-    await sleep(60);
-    const n13 = captionNumbers(rows);
-    const verdict = document.querySelector("#tour-card .tour-text").textContent
-      .includes(res.targets.abatement.met ? "is met at these inputs" : "is not met at these inputs");
+    const short = (resolvePath(res, "balances.energy.unmet_thermal") || 0) > 0;
+    const needOk = !short || ((await at("primary")).includes("At the need") && (await at("secondary")).includes("At the need"));
+    await at("power");
+    const p100 = powerStepOk(res);
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    const v100 = (await at("closing")).includes(abatementPhrase(res.targets.abatement));
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    tour.exitTour(false);
+    const resA = await pageSolve({ basis: "case_a" }, true);
+    tour.startTour({ reduced: true, step: a.ids.indexOf("power") });
+    await sleep(80);
+    const pA = powerStepOk(resA);
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    const vA = (await at("closing")).includes(abatementPhrase(resA.targets.abatement));
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
     tour.exitTour(false);
     await pageSolve(null, true);
-    const bad = [...n1.bad, ...n13.bad];
-    add("tour_follows_controls", warnOk && ratingOk && verdict && bad.length === 0,
-      `rating 100 MWth: infeasibility reason shown ${warnOk}, rating shown ${rating ? rating.textContent : "none"}, abatement verdict stated ${verdict}, ${n1.count + n13.count} numbers equal to the reply${bad.length ? `; ${bad.slice(0, 4).join("; ")}` : ""}`);
+    add("tour_follows_controls", warnOk && ratingOk && needOk && p100.ok && v100 && pA.ok && vA && bad.length === 0,
+      `rating 100 MWth: infeasibility reason shown ${warnOk}, rating shown ${rating ? rating.textContent : "none"}, IHX and process heat at the need ${needOk}, step 12 ${p100.text}, abatement verdict "${abatementPhrase(res.targets.abatement)}" stated ${v100}; Case A: step 12 ${pA.text}, abatement verdict "${abatementPhrase(resA.targets.abatement)}" stated ${vA}; ${count} numbers equal to the reply${bad.length ? `; ${bad.slice(0, 4).join("; ")}` : ""}`);
   } catch (e) {
     add("tour_follows_controls", false, String(e && e.message ? e.message : e));
     tour.exitTour(false);
