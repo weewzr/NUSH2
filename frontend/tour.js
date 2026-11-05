@@ -66,8 +66,15 @@ const rejectLeaves = (c) => exported(c) || burned(c);
 const selexol = (c) => c.x.tail_gas === "inl_selexol";
 const recycles = (c) => c.q(RECYCLED.p) > 0;
 const hasReboiler = (c) => c.q(Q_REB.p) > 0;
-const CRYO_LINES = ["R1", "S21", "S03", "S15"];
-const idle = (c) => (exported(c) ? ["S14", ...CRYO_LINES, "S16"] : burned(c) ? CRYO_LINES : []);
+
+/** Lines of the closing step: every drawn line that an earlier step of the
+ * same scenario moves, in drawing order. A line the steps leave dark in this
+ * scenario stays dark at the close too, such as the recycle lines when the
+ * reject is exported, or the MEA regeneration lines under Selexol. */
+function closingLines(c) {
+  const moved = new Set(STEPS.filter((s) => !s.all).flatMap((s) => streamIds(pick(s.flows, c))));
+  return allStreams().filter((id) => moved.has(id));
+}
 
 // Heat duties above the rated reactor: the IHX and reformer figures are then
 // what the plant would need, and the warning gives the engine's reason. With no
@@ -450,7 +457,7 @@ const STEPS = [
     all: true,
     units: [],
     marks: [],
-    flows: (c) => [allStreams().filter((id) => !idle(c).includes(id))],
+    flows: (c) => [closingLines(c)],
     lead: "htgr",
     feas: true,
     nums: {
@@ -868,7 +875,7 @@ function keyHint() {
   if (!el.keys) return;
   el.keys.textContent = still
     ? "With focus off the drawing, the Left and Right arrow keys change the step. Escape leaves the tour."
-    : "With focus off the drawing, the Left and Right arrow keys change the step and Space pauses or plays. Escape leaves the tour.";
+    : "With focus off the drawing, the Left and Right arrow keys change the step, and Space pauses or plays except on a button or a link, where it keeps its usual action. Escape leaves the tour.";
 }
 
 // ------------------------------------------------------------------ controls
@@ -922,15 +929,60 @@ function armTimer() {
   if (!playing) stepAnim.pause();
 }
 
-/** Keep the head of the caption card in view when the step changes: the side
- * column goes back to its top, and when the card head sits above the window,
- * the page scrolls up to it. A card below the window is left there, since the
- * reader is then looking at the drawing. */
+// Room kept around a focused tour button, so its focus ring shows as well.
+const RING_PX = 8;
+
+/** The side column when it scrolls by itself, from 1200 px wide. */
+function sideScroller() {
+  const side = el.card.parentElement;
+  if (!side) return null;
+  const o = getComputedStyle(side).overflowY;
+  return o === "auto" || o === "scroll" ? side : null;
+}
+
+/** How far a button could move down and still show whole, with its ring, in
+ * the window and in the side column that holds it; below zero when some of
+ * it is hidden now. */
+function roomBelow(b) {
+  const r = b.getBoundingClientRect();
+  let lo = 0;
+  let hi = window.innerHeight;
+  const side = sideScroller();
+  if (side && side.contains(b)) {
+    const s = side.getBoundingClientRect();
+    lo = Math.max(lo, s.top);
+    hi = Math.min(hi, s.bottom);
+  }
+  if (r.top < lo + RING_PX - 1 || r.bottom > hi - RING_PX + 1) return -1;
+  return window.innerHeight - RING_PX - r.bottom;
+}
+
+/** Keep the tour in view when the step changes. The side column goes back to
+ * its top, and when the card head sits above the window, the page scrolls up
+ * to it. A card below the window is left there, since the reader is then
+ * looking at the drawing.
+ *
+ * When the reader stepped with a button of the card or the bar, that button
+ * keeps focus and stays in view: the page scrolls up to the card head only as
+ * far as the button allows, and when the new card pushes the button out of
+ * the side column or the window, they scroll just far enough to show it. */
 function keepCard() {
   const side = el.card.parentElement;
   if (side && side.scrollTop > 0) side.scrollTop = 0;
+  const behavior = still ? "auto" : "smooth";
   const top = el.card.getBoundingClientRect().top;
-  if (top < 0) window.scrollBy({ top: top - 8, behavior: still ? "auto" : "smooth" });
+  const a = document.activeElement;
+  const btn = a && a.tagName === "BUTTON" && (el.card.contains(a) || el.bar.contains(a)) ? a : null;
+  if (!btn) {
+    if (top < 0) window.scrollBy({ top: top - 8, behavior });
+    return;
+  }
+  const room = roomBelow(btn);
+  if (room < 0) {
+    btn.scrollIntoView({ block: "nearest", inline: "nearest", behavior });
+  } else if (top < 0 && room > 0) {
+    window.scrollBy({ top: -Math.min(8 - top, room), behavior });
+  }
 }
 
 function go(i, first) {
@@ -1091,6 +1143,7 @@ function onKey(e) {
     e.preventDefault();
     go(idx - 1);
   } else if (e.key === " " || e.key === "Spacebar") {
+    // A focused button or link keeps its own Space, as the key line says.
     if (t && t.closest("button, a[href], summary")) return;
     e.preventDefault();
     toggle();

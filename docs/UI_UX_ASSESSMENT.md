@@ -95,7 +95,7 @@ Each step dims the rest of the drawing, lights its units with a soft glow, keeps
 | 10 | Stripper and reboiler heat | rich/lean exchanger, stripper, reboiler, lean cooler, pump | S17, L3, L5 with L6, L4, S18 | stripper pressure, reboiler duty, specific duty, the four heat sources in their approved order |
 | 11 | CO2 compression, ship and offshore storage | condenser, CO2 compressor, storage | C1, S19, S20 (S19, S20 under Selexol) | compression electricity, CO2 shipped, tariff and charge |
 | 12 | Power block and site electricity | power block, circulators, HTGR | P1, P4 (none when the branch carries nothing) | helium branch, electricity generated at the reactor output, efficiency, reactor steam to the reboiler, circulator and site demand, grid import; on an infeasible plant the branch and the turbine output at the need |
-| 13 | The plant from end to end | whole plant | every stream at once | purified H2, CO2 stored and released, baseline, net abatement on three baselines, target verdict and the engine's cost verdict |
+| 13 | The plant from end to end | whole plant | at once, every stream that an earlier step of the same scenario moves | purified H2, CO2 stored and released, baseline, net abatement on three baselines, target verdict and the engine's cost verdict |
 
 The play-speed dwell is 7 or 8 s a step, 97 s for all 13. Under reduced motion there is no auto-advance.
 
@@ -112,6 +112,7 @@ The tour follows the plant as the engine models it, including its stated limits:
 - Step 12 splits the power branch as the engine does: the steam for the reboiler does back-pressure work in the turbine before it heats the reboiler, and the rest of the branch drives the turbine at the conversion efficiency.
 - Step 13 states the abatement verdict and the cost verdict the engine gives. Net abatement at or above the target on an infeasible plant is said to be above the target and not counted as met. The CO2 never formed is credited to reactor heat replacing the reformer's fuel gas and, while the cryogenic recycle runs, to the methane it returns to the feed.
 - When the PSA reject is exported, steps 9 and 13 stop animating the recycle lines and the stack. When it is burned on site, they light the reject's return and the stack, and step 9 says the burner is not drawn. Under Selexol, steps 6, 7, 10 and 11 leave out what belongs to the MEA plant, and step 9 drops the MEA limit on the cryogenic unit.
+- Step 13 moves only the lines that steps 1 to 12 of the same scenario move, so a line those steps leave dark stays dark at the close: under Selexol the MEA regeneration lines L3 to L6 and the condenser line C1, and with the reject burned on site the power branch P4, which then carries nothing.
 - Step 13 notes that the Western Island site is the author's proposal with no official approval.
 
 Drawn without engine data, and tagged on screen as illustrations: the fission inset of step 1 (a neutron splitting a uranium nucleus inside a TRISO particle in graphite, the heat passing to helium), the ship inset of step 11, and the reaction lines of steps 4, 5 and 7. The insets carry no numerals. The caption also says where the drawing simplifies: the reformer's helium connections are schematic (the engine's tube model runs the helium in counterflow), the PSA beds are schematic, the secondary circulator and the heat lines into the reboiler are not drawn, and the burner of the nitrogen-rich cut is represented by the stack.
@@ -138,8 +139,8 @@ Every stream moves at one fixed screen speed, and the card says the speed carrie
 ### 5.5 Controls and accessibility
 
 - Every control is a real button reachable by keyboard. Previous and Next use `aria-disabled` at the ends, so focus never lands on a disabled element.
-- Starting the tour brings the tour near the top of the window: the top of the layout when the card is in the side column, the bar when the card sits under the drawing. Focus then goes to the step title when it is fully in view, or else to the first control of the bar. On each later step change the side column returns to its top, and the page scrolls up when the card's head is above the window. Exit, or Escape, closes the tour and returns focus to the start button. Escape closes an open stream tooltip first.
-- Left and Right arrows step and Space pauses, except when focus is on a unit, a stream or a form control, where the drawing's own keys keep working. The card's own Previous and Next buttons follow the step title in the tab order, and a line under them names these keys.
+- Starting the tour brings the tour near the top of the window: the top of the layout when the card is in the side column, the bar when the card sits under the drawing. Focus then goes to the step title when it is fully in view, or else to the first control of the bar. On each later step change the side column returns to its top, and the page scrolls up when the card's head is above the window. When the reader steps with a button of the card or the bar, by mouse or by key, that button keeps focus and stays whole in view with its focus ring: the page scrolls up to the card head only as far as the button allows, and when a longer card pushes the button out of the side column or the window, they scroll just far enough to show it again. Exit, or Escape, closes the tour and returns focus to the start button. Escape closes an open stream tooltip first.
+- With focus off the drawing and off any form control, Left and Right arrows change the step; on the drawing or in a form control the arrows keep their own work. Space pauses or plays in the same places, except on a button or a link, which keeps its usual Space and Enter, so Space on the card's Previous or Next presses that button. The card's own Previous and Next buttons follow the step title in the tab order, and a line under them names these keys in the same terms.
 - Each step is announced once through a visually hidden `aria-live` region; the unit panel's own live region is silenced while the tour runs.
 - Pause stops every moving part, the dashes and the inset animations included.
 - Under `prefers-reduced-motion: reduce` the tour is still: no dashes, no inset animation, no fades, no smooth scroll, no auto-advance and no Play button. The lit lines thicken and keep their drawn arrowheads. `pfd.js` unit focus scrolling also jumps under reduced motion.
@@ -154,7 +155,7 @@ Every stream moves at one fixed screen speed, and the card says the speed carrie
 | `frontend/index.html` | Start button, control bar, caption card with its Previous and Next buttons and key line, and live region; `data-tour` keys on the core outline, the boundary, the stack and the labels the steps light. |
 | `frontend/pfd.js` | Loads the tour apart from the drawing so a fault there leaves the PFD working, passes it the drawing hooks, re-renders the open step on each reply; unit focus scrolling respects reduced motion. |
 | `frontend/panels.js` | Exports the existing reply path resolver. |
-| `frontend/selftest.js` | Eight tour checks (section 7). |
+| `frontend/selftest.js` | Ten tour checks (section 7). |
 | `scripts/selftest.py` | `--reduced-motion` emulates the media feature, so the whole self test can run against the still tour. |
 | `.github/workflows/site.yml` | Runs the browser self test a second time with `--reduced-motion`. |
 
@@ -172,41 +173,46 @@ No phase adds a dependency, so the licence position stays as it is today. Any la
 
 ## 7. Validation
 
-Only checks that ran are listed, all on the revision that carries this section. The site was built from this branch into a scratch folder with the wasm module built from the unchanged engine, served on 127.0.0.1 and driven in headless Chrome.
+Only checks that ran are listed, all on the frontend this revision commits. The wasm module was built from the unchanged engine and the site from this branch into a scratch folder, both stamped with the parent revision effa85a, then served on 127.0.0.1 and driven in headless Chrome. Checks of earlier rounds that were not run again on this revision are left out.
 
 | Check | Result |
 |---|---|
-| `scripts/build_wasm.py` with a scratch `CARGO_TARGET_DIR` | finished, 1,067,548 bytes |
-| `scripts/build_site.py` | built, 32 files, about 3.54 MB, every local reference stamped and present |
-| `scripts/selftest.py` at 1440 by 900 | PASS: 29 checks passed and `pfd_streams_bound` skipped, as it does on the main branch, because the live reply carries no stream table; 0 browser errors, 0 requests to another host |
-| `scripts/selftest.py` at 375 by 812, phone emulation | PASS, same checks |
-| `scripts/selftest.py --reduced-motion` at 1440 by 900 | PASS, same checks, with the tour checks run on the still tour |
-| `tour_steps_bound` | every unit, stream, label key, text key and reply path the 13 steps name resolves, over 16 scenario branches (each reject route, zero and non-zero values, feasible and infeasible) |
+| `scripts/build_wasm.py` with a scratch `CARGO_TARGET_DIR` | finished, 1,067,548 bytes, with the same SHA-256 as the module of the previous round |
+| `scripts/check_wasm.py` | PASS, 0 imports |
+| `scripts/build_site.py` | built, 32 files, about 3.55 MB |
+| `scripts/selftest.py --expect-commit` at 1440 by 900 | PASS: 31 checks passed and `pfd_streams_bound` skipped, as it does on the main branch, because the live reply carries no stream table; 0 browser errors, 0 requests to another host |
+| The same at 375 by 812 with phone emulation | PASS, same checks |
+| The same with `--reduced-motion`, at 1440 by 900 and at 375 by 812 with phone emulation | PASS, same checks, with the tour checks run on the still tour |
+| `tour_steps_bound` | every unit, stream, label key, text key and reply path the 13 steps name resolves, over 16 scenario branches (each reject route with zero and non-zero values, on a feasible and an infeasible plant) |
 | `tour_plays` | starts from its button with focus on the step title in view, visits all 13 steps in order with dashes moving on every step that has flows, exits by its Exit button with focus back on the start button, no error |
 | `tour_numbers_live` | 100 caption numbers over 13 steps at the default inputs, each equal to its reply field |
-| `tour_text_rules` | the prose of all 13 steps passes the visible text rules, with no placeholder left, no bare SMR and no number joined to its unit |
+| `tour_text_rules` | the prose of all 13 steps passes the visible text rules, with no placeholder left, no bare SMR, no em dash and no number joined to its unit |
 | `tour_keyboard` | ArrowRight and ArrowLeft step, Space pauses and resumes, Escape closes an open stream tip first and then the tour, focus returns to the start button, every control in the bar and the card is a button |
-| `tour_reduced_motion` | 13 still steps add no running animation, the tour does not advance by itself, Play is hidden |
+| `tour_reduced_motion` | 13 still steps add no running animation and the tour does not advance by itself, with Play hidden |
 | `tour_autoplay` | at a fast test pace the tour runs to the last step and stops; dwell 7 to 8 s a step, 97 s in all |
 | `tour_follows_controls` | at a 100 MWth rating: step 1 shows the engine's infeasibility reason and the new rating, steps 2 and 3 read their heat at the need, step 12 prints 0.00 MWe generated against 19.78 MWe of import and demand, and step 13 says the abatement is above the target but not counted as met; at Case A: step 12 prints 6.83 MWe generated and 22.10 MWe imported against 28.94 MWe of demand, with the same abatement verdict; 51 numbers equal to the reply |
-| Planted faults, self test at 1440 by 900 on a copy of the site whose `tour.js` had the old step 12 wording, no need wording on steps 2 and 3, the old abatement sentence and no space before units | FAIL as intended: `tour_text_rules` caught the joined units and `tour_follows_controls` caught the other three faults at both input sets |
-| Caption text of all 13 steps at seven input sets (default, 100 MWth, Case A, reject exported, reject burned on site, Selexol, Case A with the reject burned), read from the page | read through; the numbers in each step agree with the reply of that input set |
-| Card and focus after Start, 13 viewport sizes from 375 by 667 to 2560 by 1440, with phone emulation at the phone and tablet sizes | at every size the card head is at or below the top of the window and the focused element is fully in view; the title takes focus at 10 sizes and the Pause button at 812 by 375, 1024 by 600 and 375 by 667; after one ArrowRight the card head is still in view |
-| The same 13 sizes under reduced motion | the same, with the Next button taking focus where the title would be out of view, since Play is hidden |
-| Keyboard run with real key events at 1440 by 900 | 20 of 20 checks passed; Tab from the step title reaches the card's Previous and Next buttons |
-| Choosing a unit with Enter, or pinning a stream tip with Enter, while the tour plays | the tour pauses and the panel or tip stays after 10 s, as it does for a mouse click |
-| Side column scrolled to 700 px, then ArrowRight | the side column returns to its top and the card sits in view at 8 px |
-| Close-ups of the lead units of steps 9 and 12 at 1440 px | the lead units glow with no selection ring across the drawing's labels |
-| Full play-through at normal speed, 1440 px and 375 px phone emulation | all 13 steps advanced by themselves and the tour stopped on the last step after 97.4 s and 97.5 s, with the button reading Replay; no browser error |
-| Screenshots of steps 1, 11, 12 and 13 at 1440 px, step 4 at 375 px, and four scenario steps at 1440 px (step 9 with the reject burned on site and with it exported, step 12 at 100 MWth, step 11 under Selexol) | inspected |
-| Text contrast of the new key line, WCAG formula | 5.3:1 (`--muted` on `--page`); the lowest pair the tour uses stays 5.1:1 (`--muted` on the figure tiles) |
+| `tour_focus_kept`, new | in each of the four runs, 36 step changes, by the card's own buttons to step 13 and back and then by the bar's Next to step 13; the button used kept focus on every step and lay whole, with its focus ring, inside the window and inside the scrolling side column |
+| `tour_closing_lines`, new | for each reject route the closing step lights exactly the lines that steps 1 to 12 move, and its dashes run on those lines only: recycled, 30 lines and none dark; exported, 24 lines with S03, S14, S15, S16, S21 and R1 dark; burned on site, 25 lines with P4 (a branch of 0.0 MWth), S03, S15, S21 and R1 dark; Selexol, 25 lines with L3 to L6 and C1 dark |
+| Planted faults: the self test at 1440 by 900 and at 375 by 812 with phone emulation, on a copy of the built site carrying the `tour.js` and `tour.css` of effa85a | FAIL as intended, with 29 checks passing and `pfd_streams_bound` skipped. `tour_focus_kept` caught the card's Next out of view at step 11 (888 to 926 px in a side column shown to 892 px; 880 to 918 px in an 812 px window on the phone), and `tour_closing_lines` caught the Selexol close moving L3 to L6 and C1 and the close with the reject burned moving P4 |
+| Card's Next after Enter from step 10, real key events, at 8 window sizes from 375 by 667 to 1920 by 1080 | focus stayed on it and it showed whole (38 of 38 px) at steps 11, 12 and 13 at every size; at 1440 by 900 step 11 puts it at 846 to 884 px. Before the change it showed 0 to 4 px at step 11 at 7 of the 8 sizes |
+| Every step from the keyboard, real key events, at 13 window sizes from 375 by 667 to 2560 by 1440 (phone emulation at the phone and tablet sizes), with and without reduced motion | 60 step changes a size. The card's buttons stepped to step 13 and back by Enter and to step 13 again by ArrowRight; the bar's Next then stepped back by ArrowLeft and forward by Enter. Focus stayed on the button used and the button showed whole with its ring on all 60 at all 13 sizes in both modes. On short windows the card head sits above the window on some steps (36 of 60 at 812 by 375), since the focused button comes first |
+| Card and focus after Start at the same 13 sizes, with and without reduced motion | 13 of 13 each time: the card head is at or below the top of the window with the focused element fully in view, and after one ArrowRight from the title the card head is still in view |
+| A full keyboard tour at 1440 by 900 and at 375 by 812 with phone emulation, each with and without reduced motion: Tab to Start, Enter, steps 1 to 7 by ArrowRight, steps 7 to 13 by the card's Next | all 13 steps visited with the focused element in view on each (the card's Next at step 11 at 846 to 884 px and at 766 to 804 px), Enter on the disabled last Next stays put, Escape returns focus to the start button, no browser error; under reduced motion no animation or dash appears on any step, and the tour is still on step 1 after 9 s |
+| Keyboard run with real key events at 1440 by 900 | 20 of 20 checks passed, among them Enter and Space on the bar's Next, which each press it |
+| Space on the card's Next while the tour plays | moves to step 2 and the tour keeps playing, which the key line now states: Space pauses or plays except on a button or a link, where it keeps its usual action |
+| A unit chosen on the drawing by Enter or by mouse while the tour plays | the tour pauses, and the unit's panel is still open 10.2 s and 10.1 s later |
+| A stream tip pinned with Enter, or a unit chosen from the unit list, while the tour plays | the tour pauses; the tip is still pinned after 10.1 s, and the chosen panel is still open after 9.6 s |
+| Tab from the step title at 1440 by 900 and at 375 by 812 | reaches the card's Previous and then its Next |
+| Side column scrolled to 700 px, then ArrowRight with focus on the title | the side column returns to its top and the card sits in view at 8 px |
 | `scripts/check_site.py --site <site> --repo .` | PASS: site 32 files, 0 hits; repository 219 files, 0 hits |
 | `scripts/check_site.py --site <site> --repo . --prove` | PASS: site proof 34 plants, 34 caught; repository proof 11 plants, 11 caught |
 | `scripts/check_clean.py` | 221 files scanned, 0 hits |
+| The pre-push scan kept outside the repository, on the tree with code only | 222 files, 0 hits |
 
 ### 7.1 What this stage did not change or run
 
 - No change under `engine/` or `results/`; the engine tests were not rerun here, since no engine file changed.
 - No third-party code, no new dependency, no change to the notices.
+- Checks of earlier rounds on parts this change leaves alone were not run again here: the full play-through at normal speed, the screenshots and close-ups, the read-through of every caption at seven input sets, and the contrast measure. The captions, the dwell times and the colours are unchanged; the only new text is the key line under the card.
 - The dark theme, the camera, zoom and the other phases of section 6 are not built yet.
 - Drawing questions left open: whether to redraw the reformer's helium connections as counterflow and the PSA beds with their real nozzles, whether to draw the secondary circulator, the heat lines into the reboiler and the burner, and whether the drawing's own labels (the power block's output, the reformer's process heat) should read the delivered values on an infeasible plant. The tour names each simplification on screen in the meantime.

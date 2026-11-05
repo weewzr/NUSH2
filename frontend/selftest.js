@@ -591,7 +591,9 @@ const press = (key) => (document.activeElement || document.body)
 // The guided tour of the PFD page: its steps name real units, streams and
 // reply fields; it starts from its button, visits every step and exits with no
 // error; each caption number equals its source; the keys work; reduced motion
-// runs no animation and does not advance; the numbers follow the controls.
+// runs no animation and does not advance; the numbers follow the controls; a
+// button the reader steps with keeps focus and stays in view; the closing step
+// moves only the lines the earlier steps of the same scenario move.
 async function tourChecks(add) {
   location.hash = "#pfd";
   await sleep(ROUTE_WAIT_MS);
@@ -818,6 +820,121 @@ async function tourChecks(add) {
       `rating 100 MWth: infeasibility reason shown ${warnOk}, rating shown ${rating ? rating.textContent : "none"}, IHX and process heat at the need ${needOk}, step 12 ${p100.text}, abatement verdict "${abatementPhrase(res.targets.abatement)}" stated ${v100}; Case A: step 12 ${pA.text}, abatement verdict "${abatementPhrase(resA.targets.abatement)}" stated ${vA}; ${count} numbers equal to the reply${bad.length ? `; ${bad.slice(0, 4).join("; ")}` : ""}`);
   } catch (e) {
     add("tour_follows_controls", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // A button the reader steps with keeps focus, and the button with its focus
+  // ring lies whole inside the window and inside the side column when that
+  // column scrolls. The card's own buttons step to the end and back, then
+  // the bar's Next steps to the end again.
+  try {
+    const card = document.getElementById("tour-card");
+    const side = card.parentElement;
+    const rest = async () => {
+      let key = "";
+      let calm = 0;
+      for (let i = 0; i < 50 && calm < 3; i += 1) {
+        await sleep(60);
+        const now = `${window.scrollY}|${side.scrollTop}`;
+        calm = now === key ? calm + 1 : 0;
+        key = now;
+      }
+    };
+    const whole = (b) => {
+      const r = b.getBoundingClientRect();
+      let lo = 0;
+      let hi = window.innerHeight;
+      const o = getComputedStyle(side).overflowY;
+      if (side.contains(b) && (o === "auto" || o === "scroll")) {
+        const s = side.getBoundingClientRect();
+        lo = Math.max(lo, s.top);
+        hi = Math.min(hi, s.bottom);
+      }
+      // The ring is a 2 px outline 2 px off the button.
+      const ok = r.width > 0 && r.top - 4 >= lo - 0.5 && r.bottom + 4 <= hi + 0.5;
+      return { ok, at: `${Math.round(r.top)}..${Math.round(r.bottom)} px, shown ${Math.round(lo)}..${Math.round(hi)} px` };
+    };
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    await rest();
+    if (tour.tourState().playing) act("play").click();
+    const bad = [];
+    let moves = 0;
+    const stepWith = async (b, label) => {
+      b.focus();
+      await rest();
+      for (let k = 0; k < n - 1; k += 1) {
+        b.click();
+        await rest();
+        moves += 1;
+        const at = `${label}, step ${tour.tourState().step + 1}`;
+        if (document.activeElement !== b) {
+          bad.push(`${at}: focus moved off the button`);
+          continue;
+        }
+        const w = whole(b);
+        if (!w.ok) bad.push(`${at}: button at ${w.at}`);
+      }
+    };
+    await stepWith(card.querySelector('[data-act="next"]'), "card Next");
+    const atEnd = tour.tourState().step === n - 1;
+    await stepWith(card.querySelector('[data-act="prev"]'), "card Previous");
+    const atStart = tour.tourState().step === 0;
+    await stepWith(act("next"), "bar Next");
+    const done = tour.tourState().step === n - 1;
+    tour.exitTour(false);
+    add("tour_focus_kept", bad.length === 0 && atEnd && atStart && done && moves === 3 * (n - 1),
+      `${moves} step changes by the card's buttons and the bar's Next${reducedOS ? " under reduced motion" : ""}; the button kept focus and showed whole with its ring on every step ${bad.length === 0}; ends reached ${atEnd && atStart && done}${bad.length ? `; ${bad.slice(0, 5).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_focus_kept", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // The closing step moves the lines that the steps before it move in the
+  // same scenario, and no other line, for each reject route: under Selexol it
+  // leaves the MEA regeneration lines dark as steps 10 and 11 do. Its dashes
+  // run on those lines only.
+  try {
+    const lines = Array.from(document.querySelectorAll("#pfd-svg .pfd-streams > [data-stream]")).map((g) => g.dataset.stream);
+    const pathOf = (id) => {
+      const g = document.querySelector(`#pfd-svg .pfd-streams > [data-stream="${id}"]`);
+      const p = g && (g.querySelector("path.core") || g.querySelector("path.vent"));
+      return p ? p.getAttribute("d") : null;
+    };
+    const parts = [];
+    const bad = [];
+    for (const route of ["recycle", "export", "burn_on_site", "inl_selexol"]) {
+      const res = await pageSolve({ tail_gas: route }, true);
+      if (!res || !res.inputs || res.inputs.tail_gas !== route) {
+        bad.push(`${route}: no reply`);
+        continue;
+      }
+      tour.startTour({ reduced: true, step: 0 });
+      const moved = new Set();
+      for (let i = 0; i < n - 1; i += 1) {
+        tour.goTour(i);
+        for (const g of document.querySelectorAll("#pfd-svg .pfd-streams > .tour-move")) moved.add(g.dataset.stream);
+      }
+      tour.exitTour(false);
+      tour.startTour({ reduced: false, step: n - 1 });
+      const lit = new Set(Array.from(document.querySelectorAll("#pfd-svg .pfd-streams > .tour-on")).map((g) => g.dataset.stream));
+      const litPaths = new Set([...lit].map(pathOf));
+      const dashes = Array.from(document.querySelectorAll("#pfd-svg .tour-flow")).map((p) => p.getAttribute("d"));
+      tour.exitTour(false);
+      const extra = lines.filter((id) => lit.has(id) && !moved.has(id));
+      const lost = lines.filter((id) => moved.has(id) && !lit.has(id));
+      const stray = dashes.filter((d) => !litPaths.has(d)).length;
+      if (extra.length) bad.push(`${route}: closing moves ${extra.join(" ")}, which no earlier step moves`);
+      if (lost.length) bad.push(`${route}: closing leaves out ${lost.join(" ")}`);
+      if (stray || dashes.length !== lit.size) bad.push(`${route}: ${dashes.length} dash paths for ${lit.size} lines, ${stray} off them`);
+      const dark = lines.filter((id) => !lit.has(id));
+      parts.push(`${route} ${lit.size} lines moving, dark ${dark.length ? dark.join(" ") : "none"}`);
+    }
+    await pageSolve(null, true);
+    add("tour_closing_lines", bad.length === 0 && parts.length === 4,
+      `${parts.join("; ")}${bad.length ? `; ${bad.slice(0, 6).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_closing_lines", false, String(e && e.message ? e.message : e));
     tour.exitTour(false);
   }
 }

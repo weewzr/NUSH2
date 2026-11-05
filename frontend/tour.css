@@ -66,6 +66,9 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  /* The room tour.js keeps around a focused button when it scrolls it back
+     into view, so the focus ring shows too. */
+  scroll-margin: 8px;
 }
 .tour-btn:hover { border-color: var(--accent); }
 .tour-btn svg { width: 13px; height: 13px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
