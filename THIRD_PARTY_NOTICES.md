@@ -48,12 +48,13 @@ Slide numbers are pages of the presentation PDF.
 | Slide 71 | Map of Singapore | None printed |
 | Report, Figure 1 | Process-heat temperature ranges of industrial applications, with the ranges that light-water reactors and HTGRs serve; the image carries the identifier 08-GA50599-04 | Caption: D. Mears, Module 2b: HTGR Motivations and Applications, NRC HTGR Technology Course, 2010 (slide: Process Application Temperatures) |
 
-Two further figures were drawn for this project after a cited figure. They hold no third-party
+Three further figures were drawn for this project after a cited figure. They hold no third-party
 pixels, and the figures they follow keep their owners' rights:
 
 | Where | What it shows | Drawn after |
 |---|---|---|
 | Slide 12 | Process-heat temperature ranges, redrawn as a bar chart | D. Mears, 2010, as the slide's source line states |
+| Slide 64 | Process-heat temperature ranges with the light-water reactor and HTGR bands, redrawn as shapes on the Q&A slide | D. Mears, 2010 |
 | Slide 21 and report Figure A1 | Frequency-consequence target behind an emergency planning zone, a schematic with no values | The Xe-100 plume exposure pathway EPZ report in the Long Mott Generating Station construction permit application, NRC ADAMS ML25090A066 |
 
 Every other image in the four files is the project's own: the NUS-H2 process flow figure and its
