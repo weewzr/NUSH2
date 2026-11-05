@@ -21,6 +21,46 @@ Figures and photographs in the report and the presentation that are credited to 
 and any other third-party image in them, belong to their owners and are not covered by the MIT
 licence; see `README.md`, section "Licence and credit".
 
+## Third-party images in the report and the presentation
+
+The images below sit in `presentation/NUSH2_Final_Presentation.pptx` and its PDF, and in
+`report/NUSH2_Final_Report.docx` and its PDF. They belong to their owners, the MIT licence does not
+cover them, and this repository grants no right to reuse them. The credit column gives the source
+as the file prints it: on the image itself, in the figure caption, in the slide's source line or in
+the picture's alternative text. "None printed" means the file carries no credit for that image.
+Slide numbers are pages of the presentation PDF.
+
+| Where | What it shows | Source as printed |
+|---|---|---|
+| Slides 1 and 4 | Chimney with a plume of smoke, a photograph in purple duotone | None printed |
+| Slide 2 | Industrial skyline with chimneys, a photograph in purple duotone | None printed |
+| Slide 3 | Close view of industrial stacks, a photograph in purple duotone | None printed |
+| Slide 13 | Diagram of a neutron splitting a uranium-235 nucleus | Source line: Nuclear-Power.com |
+| Slide 24 | Map graphic of the planned new western island and its link to Jurong Island | On the image: Prime Minister's Office; photo, Google Earth; Straits Times Graphics |
+| Slide 35 | Render of the Xe-100 reactor vessel and steam generator, shown as an analogue only | Source line: X-energy |
+| Slide 57 | Photographs of the ACP100, KLT-40S, NuScale and BWRX-300 designs | None printed; the alternative text names each design |
+| Slides 58 and 59 | Cutaway of a TRISO coated particle | Alternative text: INL |
+| Slides 58 and 61 | Drawing of a pebble-bed HTGR reactor vessel (HTR-PM) | None printed |
+| Slide 62 | Frequency-consequence target for emergency planning, drawn on the slide with the dose in rem | Caption: slightly modified from the Preliminary Safety Analysis Report submitted to the US NRC for the 4 x 80 MWe Xe-100 at Long Mott Generating Station, Texas |
+| Slide 65 | Rendering of the Xuwei site | None printed |
+| Slide 67 | Spent fuel pool, dry cask storage and an illustration of a deep geological repository | None printed |
+| Slide 70 | Photographs of Big Rock Point, Diablo Canyon, Kashiwazaki and Olkiluoto 3, and an image of a fusion device | Captions name the plants; no source printed |
+| Slide 71 | Map of Singapore | None printed |
+| Report, Figure 1 | Process-heat temperature ranges of industrial applications, with the ranges that light-water reactors and HTGRs serve; the image carries the identifier 08-GA50599-04 | Caption: D. Mears, Module 2b: HTGR Motivations and Applications, NRC HTGR Technology Course, 2010 (slide: Process Application Temperatures) |
+
+Three further figures were drawn for this project after a cited figure. They hold no third-party
+pixels, and the figures they follow keep their owners' rights:
+
+| Where | What it shows | Drawn after |
+|---|---|---|
+| Slide 12 | Process-heat temperature ranges, redrawn as a bar chart | D. Mears, 2010, as the slide's source line states |
+| Slide 64 | Process-heat temperature ranges with the light-water reactor and HTGR bands, redrawn as shapes on the Q&A slide | D. Mears, 2010 |
+| Slide 21 and report Figure A1 | Frequency-consequence target behind an emergency planning zone, a schematic with no values | The Xe-100 plume exposure pathway EPZ report in the Long Mott Generating Station construction permit application, NRC ADAMS ML25090A066 |
+
+Every other image in the four files is the project's own: the NUS-H2 process flow figure and its
+crops, the roadmap, the equation image, the crossed-out conventional plant drawings on slide 17,
+and the charts drawn from `results/` through `build/numbers.json`.
+
 ## itoa 1.0.18, MIT
 
 ```text

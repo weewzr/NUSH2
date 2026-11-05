@@ -2,9 +2,10 @@
 """Number map: read the seven results CSVs, write build/numbers.json.
 
 This file is the only route by which a result reaches a document. It is a pure
-function of results/*.csv: no timestamp, no commit id, no TOML, so two runs on the
-same CSVs give identical bytes. Builders read tokens[NAME]["text"] for prose and
-tokens[NAME]["table"] for tables, and never type a result.
+function of results/*.csv and the CITED rows below: no timestamp, no commit id, no
+TOML, so two runs on the same CSVs give identical bytes. Builders read
+tokens[NAME]["text"] for prose and tokens[NAME]["table"] for tables, and never type a
+result or compute one.
 
 Usage:
     python scripts/build_numbers.py           write build/numbers.json and a grep index
@@ -27,6 +28,10 @@ Token families, all in tokens{}:
     VAL_N_PASS, VAL_<TEST>_SIM, ...           validation counts and rows
     LEVER_, EXCESS_, BUDGET_, NUCLEAR_ITEMS_  distance to the cost target, recomputed
     A_ATM_B_MT, Q_PROCESS_B_MWTH, ...         named aliases in ALIASES below
+    PRODUCT_C_T_Y, OCC_10OAK_P46_USD_KWT, ...  document forms of results (add_document_forms)
+    STEP_TS_BOAK_25Y_N1P00                    one ledger line as its own step in S$/t
+    VALLEVEL_2_PASS, VALPCT_DICE_SRD           validation counts by level, benchmark errors in %
+    LIT_HTTR_OUTLET_C, NDC_2035_LOW_MT, ...    published constants a document cites (CITED)
 
 A row the engine did not run has value null and text "not run". Exit 1, with nothing
 written, if a CSV, a column, an alias or an arithmetic identity fails. Soft findings
@@ -144,6 +149,39 @@ SCREENING = [
     ("Net abatement Case B, t/y", "RES_ABATEMENT_T_Y", 578052.0, 0.005, True),
     ("Reactor needed Case B, MWth", "RES_REACTOR_NEEDED_MWTH", 179.0, 1.0, False),
     ("L3 cost, BOAK, 25 y, S$/t", "AC_L3_BOAK_25Y_N1P00", 137.7, 1.0, False),
+]
+
+# Published constants that the report cites in its prose and that no engine model uses,
+# so they are not engine inputs. Each row: token, value, unit, decimal places (text and
+# table), source with the report reference key. A document prints them as tokens like any
+# other number, so no figure is typed into a document.
+CITED = [
+    ("LIT_SG_GAS_POWER_SHARE_PCT", 94.0, "%", 0, "EMA, natural gas share of electricity-generation fuel in 2024 (refs r1, r2)"),
+    ("LIT_REFORMING_LOW_C", 500.0, "C", 0, "Mears 2010, slide Process Application Temperatures, steam reforming of natural gas (ref r6)"),
+    ("LIT_REFORMING_HIGH_C", 900.0, "C", 0, "Mears 2010, slide Process Application Temperatures, steam reforming of natural gas (ref r6)"),
+    ("LIT_PILOT_SRD_VINJARAPU_GJ_T", 3.46, "GJ/t", 2, "Vinjarapu et al. 2024, pilot SRD of 30 wt% MEA on flue gas, lower value (ref r31)"),
+    ("LIT_PILOT_SRD_BRIGMAN_GJ_T", 4.0, "GJ/t", 1, "Brigman et al. 2014, pilot SRD of 30 wt% MEA on flue gas, upper value (ref r32)"),
+    ("LIT_PILOT_MEA_LOW_WT_PCT", 26.0, "wt%", 0, "Vinjarapu et al. 2024, MEA strength behind the lower pilot value (ref r31)"),
+    ("LIT_PILOT_MEA_HIGH_WT_PCT", 27.0, "wt%", 0, "Vinjarapu et al. 2024, MEA strength behind the lower pilot value (ref r31)"),
+    ("LIT_PILOT_CAPTURE_PCT", 85.0, "%", 0, "Brigman et al. 2014, capture behind the upper pilot value (ref r32)"),
+    ("LIT_PILOT_FEED_CO2_VOL_PCT", 3.5, "vol%", 1, "Brigman et al. 2014, CO2 in the flue gas behind the upper pilot value (ref r32)"),
+    ("LIT_HTTR_OUTLET_C", 950.0, "C", 0, "JAEA, HTTR reactor outlet reached (ref r11)"),
+    ("LIT_HTTR_POWER_MWT", 30.0, "MWt", 0, "JAEA, HTTR thermal power (ref r11)"),
+    ("LIT_HTRPM_OUTLET_C", 750.0, "C", 0, "World Nuclear News 2023, HTR-PM outlet (ref wnn2023)"),
+    ("LIT_XE100_OUTLET_C", 750.0, "C", 0, "X-energy, Xe-100 outlet (ref xenergy)"),
+    ("LIT_XE100_EPZ_M", 400.0, "m", 0, "Long Mott construction permit application, Xe-100 EPZ reference distance (ref r17)"),
+    ("LIT_INIR_AREAS", 19.0, "areas", 0, "METI, 19 May 2026, INIR covers 19 infrastructure areas (ref r21)"),
+    ("LIT_HTRPM_BUILD_Y", 11.0, "y", 0, "WNA reactor database, HTR-PM 1 construction start 9 Dec 2012 to commercial operation 5 Dec 2023 (ref r12)"),
+    ("NDC_2035_LOW_MT", 45.0, "MtCO2e", 0, "NCCS, Singapore's 2035 NDC, 45 to 50 MtCO2e in 2035 (ref nccsndc)"),
+    ("NDC_2035_HIGH_MT", 50.0, "MtCO2e", 0, "NCCS, Singapore's 2035 NDC, 45 to 50 MtCO2e in 2035 (ref nccsndc)"),
+    ("LIT_INL_OCC_USD_KWE", 6000.0, "US$/kWe", 0, "INL/RPT-23-72972 Rev 3 Table 1, central HTGR overnight cost (ref inlcost)"),
+    ("LIT_INL_CONVERSION_SHARE", 0.09, "-", 2, "INL/RPT-23-72972 PDF p47 recipe, power conversion share removed (ref inlcost)"),
+    ("LIT_INL_EFFICIENCY", 0.40, "-", 2, "INL/RPT-23-72972 PDF p47 recipe, conversion efficiency (ref inlcost)"),
+    ("LIT_INL_CASE6_EQUIV_MWTH", 178.8, "MWth", 1, "TEV-961 Table 2, equivalent reactor size of Case 6 (ref r8)"),
+    ("LIT_INL_CASE6_IMPORT_MWE", 16.5, "MWe", 1, "TEV-961 Table 2, Case 6 electricity import (ref r8)"),
+    ("LIT_INL_PRODUCT_CH4_MASS_PCT", 0.79, "mass%", 2, "TEV-953, methane in the hydrogen product (ref r10)"),
+    ("LIT_JAERI_APPROACH_LOW_K", 102.0, "K", 0, "JAERI-Tech 2005-031, measured helium-to-process approach (ref jaeri2005)"),
+    ("LIT_JAERI_APPROACH_HIGH_K", 125.0, "K", 0, "JAERI-Tech 2005-031, measured helium-to-process approach (ref jaeri2005)"),
 ]
 
 # One quantity written in two results files. A mismatch means the CSVs came from
@@ -547,6 +585,19 @@ def add_validation(tok, rows):
         n = float(sum(r["data_use"] == "independent" and r["status"] == status for r in rows))
         tok.add(f"VAL_N_INDEPENDENT_{status.upper()}", n, "rows",
                 f"{src}:data_use=independent,status={status}", derived=True)
+    # The same counts by validation level, for the appendix table of the report.
+    for lvl in sorted({r["level"] for r in rows}):
+        sub = [r for r in rows if r["level"] == lvl]
+        lsrc = f"{src}:level={lvl}"
+        tok.add(f"VALLEVEL_{lvl}_N", float(len(sub)), "rows", lsrc, derived=True)
+        for status in ("pass", "fail", "reported", "not_run"):
+            tok.add(f"VALLEVEL_{lvl}_{status.upper()}", float(sum(r["status"] == status for r in sub)), "rows",
+                    f"{lsrc},status={status}", derived=True)
+        tok.add(f"VALLEVEL_{lvl}_INDEPENDENT", float(sum(r["data_use"] == "independent" for r in sub)), "rows",
+                f"{lsrc},data_use=independent", derived=True)
+        tok.add(f"VALLEVEL_{lvl}_INDEP_PASS",
+                float(sum(r["data_use"] == "independent" and r["status"] == "pass" for r in sub)), "rows",
+                f"{lsrc},data_use=independent,status=pass", derived=True)
     for r in rows:
         key = r["test_id"].upper()
         tok.add(f"VAL_{key}_STATUS", r["status"], "", f"{src}:{r['test_id']}:status")
@@ -670,6 +721,132 @@ def add_derived(tok, tables, checks):
                             f"LEVER_GAS_{tag}_S_GJ / GAS_CENTRAL", places=(1, 2), **d)
 
 
+def add_cited(tok):
+    for name, value, unit, dp, source in CITED:
+        tok.add(name, value, unit, f"cited: {source}", "input", places=(dp, dp))
+
+
+def add_document_forms(tok, tables, checks):
+    """The forms in which the report and the deck print results: unit scalings, sums,
+    differences and ratios of results rows, each with its formula as the source, so no
+    builder computes a printed number. Nothing here reads an input file or adds physics."""
+    d = dict(derived=True)
+    ac = tok.value
+
+    def scaled(name, ref, factor, unit, places=None):
+        tok.add(name, ac(ref) * factor, unit, f"{ref} x {factor:g}", places=places, **d)
+
+    # Abatement against the target and against Singapore's 2035 NDC level.
+    tok.add("ABATEMENT_MULTIPLE", ac("RES_ABATEMENT_T_Y") / ac("TARGET_ABATEMENT"), "x",
+            "RES_ABATEMENT_T_Y / TARGET_ABATEMENT", places=(1, 1), **d)
+    tok.add("NDC_SHARE_LOW_PCT", 100 * ac("RES_ABATEMENT_T_Y") * 1e-6 / ac("NDC_2035_HIGH_MT"), "%",
+            "100 x RES_ABATEMENT_T_Y / 1e6 / NDC_2035_HIGH_MT", **d)
+    tok.add("NDC_SHARE_HIGH_PCT", 100 * ac("RES_ABATEMENT_T_Y") * 1e-6 / ac("NDC_2035_LOW_MT"), "%",
+            "100 x RES_ABATEMENT_T_Y / 1e6 / NDC_2035_LOW_MT", **d)
+
+    # Carbon ledger of Case B in t/y. Product methane carbon is the H2 product stream's carbon,
+    # put in t CO2 per year at the captured stream's own t per kmol.
+    capt, atm, base = ac("RES_CAPTURED_T_Y"), ac("RES_ATM_T_Y"), ac("RES_BASELINE_T_Y")
+    product = ac("MB_B_REC_F_H2_PRODUCT_C_KMOL_H") * capt / ac("RES_CAPTURED_KMOL_H")
+    tok.add("PRODUCT_C_T_Y", product, "t/y",
+            "MB_B_REC_F_H2_PRODUCT_C_KMOL_H x RES_CAPTURED_T_Y / RES_CAPTURED_KMOL_H", **d)
+    tok.add("FEED_C_T_Y", capt + atm + product, "t/y", "RES_CAPTURED_T_Y + RES_ATM_T_Y + PRODUCT_C_T_Y", **d)
+    tok.add("GAS_SAVED_C_T_Y", base - (capt + atm + product), "t/y", "RES_BASELINE_T_Y - FEED_C_T_Y", **d)
+    never = ac("RES_CARBON_NEVER_GENERATED_T_Y")
+    gap = abs(ac("GAS_SAVED_C_T_Y") + product - never)
+    checks.append({"name": "carbon_ledger_closes", "state": "ok" if gap <= 1e-6 * max(1.0, never) else "warn",
+                   "detail": f"gas saved plus product carbon against carbon never generated, residual {gap:.3e} t/y"})
+    scaled("NEVER_GENERATED_MT", "RES_CARBON_NEVER_GENERATED_T_Y", 1e-6, "Mt/y")
+    scaled("GAS_SAVING_INL_PCT", "RES_GAS_SAVING_INL", 100, "%")
+    scaled("GAS_SAVING_AHN_PCT", "RES_GAS_SAVING_AHN", 100, "%")
+    for name, ref in (("A_NORECYCLE_MT", "SENS_TAIL_GAS_2_A_T_Y"), ("A_NOHEAT_N_MT", "SENS_TAIL_GAS_3_A_T_Y"),
+                      ("A_AV65_MT", "SENS_AVAILABILITY_0P65_A_T_Y"), ("A_AV75_MT", "SENS_AVAILABILITY_0P75_A_T_Y"),
+                      ("A_AV90_MT", "SENS_AVAILABILITY_0P9_A_T_Y"), ("A_CAP80_MT", "SENS_CAPTURE_0P8_A_T_Y"),
+                      ("A_CAP85_MT", "SENS_CAPTURE_0P85_A_T_Y"), ("A_CAP95_MT", "SENS_CAPTURE_0P95_A_T_Y"),
+                      ("A_SELEXOL_MT", "SENS_SOLVENT_1_A_T_Y"), ("A_AMDEA_MT", "SENS_SOLVENT_2_A_T_Y"),
+                      ("A_REF825_MT", "SENS_REFORMER_T_825_A_T_Y"), ("A_REF800_MT", "SENS_REFORMER_T_800_A_T_Y"),
+                      ("A_CONDENSATE_MT", "SENS_CONDENSATE_CO2_1_A_T_Y"),
+                      ("A_BACKUP_CCS_MT", "SENS_BACKUP_FIRING_2_A_T_Y")):
+        scaled(name, ref, 1e-6, "Mt/y")
+
+    # Reactor need. The adverse corner above the rating is an engine row; the deck's name for it is an alias.
+    over = "DRIFT_HEADLINE_R_HIGH_OVER_RATING_MWTH"
+    tok.add("ADVERSE_SHORT_MWTH", ac(over), "MWth", f"Final_Design_Basis.csv:{over}:case_b", tok.t[over].get("status", ""))
+    tok.add("T05_NEED_SHIFT_MWTH", ac("EB_B_REC_F_ANCHORED_HTGR_HEAT") - ac("RES_REACTOR_NEEDED_MWTH"), "MWth",
+            "EB_B_REC_F_ANCHORED_HTGR_HEAT - RES_REACTOR_NEEDED_MWTH", places=(2, 2), **d)
+    tok.add("SCALE_S", ac("H2_B_KG_H") / ac("H2_A_KG_H"), "x", "H2_B_KG_H / H2_A_KG_H", places=(4, 4), **d)
+    sim = ac("VAL_SCREENING_SCALE_S_SIM")
+    checks.append({"name": "scale_s_matches_validation_row", "state": "ok" if close(ac("SCALE_S"), sim, 1e-5) else "warn",
+                   "detail": f"SCALE_S {ac('SCALE_S'):.6f} against VAL_SCREENING_SCALE_S_SIM {sim:.6f}"})
+
+    # Reactor unit cost at the tenth unit on the two published learning routes.
+    learn = (1 - ac("LEARNING")) ** math.log2(ac("LEARNING_UNITS"))
+    tok.add("OCC_10OAK_P46_USD_KWT", ac("OCC_CENTRAL") * learn, "US$2019/kWt",
+            "OCC_CENTRAL x (1 - LEARNING) ** log2(LEARNING_UNITS)", **d)
+    tok.add("OCC_10OAK_P47_USD_KWT", ac("OCC_CENTRAL") * ac("FOAK_CENTRAL") * learn, "US$2019/kWt",
+            "OCC_CENTRAL x FOAK_CENTRAL x (1 - LEARNING) ** log2(LEARNING_UNITS)", **d)
+    ratio = ac("REACTOR_CAPITAL_10OAK_P46_N1P00_SM") / ac("REACTOR_CAPITAL_BOAK_N1P00_SM")
+    checks.append({"name": "tenth_unit_cost_matches_ledger", "state": "ok" if close(ratio, learn, 1e-6) else "warn",
+                   "detail": f"ledger 10OAK_P46 over BOAK reactor capital {ratio:.6f} against the learning factor {learn:.6f}"})
+    # INL's recipe as the report prints it: the cited constants must give OCC_CENTRAL.
+    recipe = ac("LIT_INL_OCC_USD_KWE") * (1 - ac("LIT_INL_CONVERSION_SHARE")) * ac("LIT_INL_EFFICIENCY")
+    if not close(recipe, ac("OCC_CENTRAL"), 1e-9):
+        raise BuildError(f"INL recipe constants give {recipe}, not OCC_CENTRAL {ac('OCC_CENTRAL')}")
+    scaled("LIT_INL_CONVERSION_SHARE_PCT", "LIT_INL_CONVERSION_SHARE", 100, "%", places=(0, 0))
+    tok.add("LIT_INL_ONE_LESS_SHARE", 1 - ac("LIT_INL_CONVERSION_SHARE"), "-", "1 - LIT_INL_CONVERSION_SHARE",
+            places=(2, 2), **d)
+    scaled("LIT_INL_EFFICIENCY_PCT", "LIT_INL_EFFICIENCY", 100, "%", places=(0, 0))
+
+    # Capture capital per t/h of CO2 on the two IEAGHG cases, in 2025 S$.
+    eur = ac("F_2014EUR_TO_2025SGD")
+    for case in ("1A", "3"):
+        tok.add(f"CAPTURE_K_{case}_SM_TH", ac(f"CAPTURE_K_{case}_DTCR_EURM") * eur / ac(f"CAPTURE_K_{case}_T_H"),
+                "S$M per t/h", f"CAPTURE_K_{case}_DTCR_EURM x F_2014EUR_TO_2025SGD / CAPTURE_K_{case}_T_H",
+                places=(2, 2), **d)
+
+    # Comparator, IEAGHG Case 3.
+    scaled("COMPARATOR_A_MT", "RES_COMPARATOR_ABATEMENT_T_Y", 1e-6, "Mt/y")
+    scaled("COMPARATOR_CAPTURE_PCT", "COMPARATOR_OVERALL_CAPTURE", 100, "%")
+    tok.add("COMPARATOR_TS_EUR", ac("TS_LOW") / eur, "EUR/t", "TS_LOW / F_2014EUR_TO_2025SGD", places=(0, 0), **d)
+
+    # Hours without nuclear heat, over which backup firing would run.
+    tok.add("OUTAGE_H_Y", ac("RES_HOURS") * (1 - ac("AVAILABILITY")) / ac("AVAILABILITY"), "h/y",
+            "RES_HOURS x (1 - AVAILABILITY) / AVAILABILITY", **d)
+
+    # Percent forms of inputs, and the ends of the availability sweep.
+    for name, ref, dp in (("ETA_POWER_PCT", "ETA_POWER", 1), ("LEARNING_PCT", "LEARNING", 0),
+                          ("CAPTURE_FOM_PCT", "CAPTURE_FOM", 1), ("CAPTURE_FOM_HIGH_PCT", "CAPTURE_FOM_HIGH", 1),
+                          ("DISCOUNT_PCT", "DISCOUNT", 0)):
+        scaled(name, ref, 100, "%", places=(dp, dp))
+    avail = [num(r["test_value"]) for r in tables["Sensitivity_Results.csv"] if r["sweep_id"] == "AVAILABILITY"]
+    if not avail:
+        raise BuildError("Sensitivity_Results.csv has no AVAILABILITY sweep")
+    tok.add("AVAILABILITY_LOW_PCT", 100 * min(avail), "%", "100 x lowest AVAILABILITY test value", places=(0, 0), **d)
+    tok.add("AVAILABILITY_HIGH_PCT", 100 * max(avail), "%", "100 x highest AVAILABILITY test value", places=(0, 0), **d)
+
+    # Each ledger line of the headline run as its own step in S$/t, the difference of its cumulative
+    # row and the one before it in the ledger, for the value labels of the cost-ledger charts.
+    rated = ac("REACTOR_RATED_MWTH")
+    last = {}
+    for r in tables["Economic_Ledger.csv"]:
+        if r["run_id"] != "B_REC_F" or r["level"] == "DCF":
+            continue
+        key = ledger_key(r, rated)
+        if key.endswith("_NEED") or "N1P00" not in key:
+            continue
+        line, cum = r["line_id"], num(r["cum_s_per_t"])
+        prev = last.get(key)
+        tok.add(f"STEP_{line}_{key}", cum - (prev[1] if prev else 0.0), "S$/t",
+                f"CUM_{line}_{key} - " + (f"CUM_{prev[0]}_{key}" if prev else "0"), **d)
+        last[key] = (line, cum)
+
+    # Benchmark errors behind the column and flowsheet gates, in percent.
+    for test, dp in (("DICE-SRD", 0), ("KW-SRD", 0), ("SA-1", 0),
+                     ("FS_CARBON_VS_ANCHOR_TUBE", 1), ("FS_CARBON_VS_ANCHOR_TAIL_GAS", 1)):
+        tok.add(f"VALPCT_{test.replace('-', '_')}", 100 * abs(ac(f"VAL_{test}_REL")), "%",
+                f"100 x |VAL_{test}_REL|", places=(dp, dp), **d)
+
+
 def run_checks(tok, tables, checks):
     # A number written in two files must match, or Tokens.add has already refused it.
     wrong = [f"{a} {tok.value(a):.6f} against {b} {tok.value(b):.6f}" for a, b in IDENTITIES
@@ -722,6 +899,8 @@ def build():
     add_validation(tok, tables["Validation_Results.csv"])
     add_derived(tok, tables, checks)
     add_mature(tok, tables["Sensitivity_Results.csv"], checks)
+    add_cited(tok)
+    add_document_forms(tok, tables, checks)
     statuses = run_checks(tok, tables, checks)
     used_units = {t["unit"] for t in tok.t.values()}
     return {
