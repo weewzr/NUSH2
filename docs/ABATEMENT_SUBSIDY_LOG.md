@@ -87,14 +87,55 @@ Completed:
 Outstanding from this track:
 
 - N.7.2 is a function and a test, and the central result does not call it: the furnace efficiency and the steam duty of the reference have no source, so every figure against the plant-built reference is a floor.
-- N.9.5 is carried as the CO2 view. No value of a warming potential exists in the repository, so the CO2e term stays at its zero default.
+- N.9.5 was first carried as the CO2 view with the CO2e term at its zero default, on the belief that no value of a warming potential existed in the repository. Fix round 1 below replaces this: the lifecycle views are CO2e views with the horizon and source of each term stated.
 - The heat and power balance keeps the anchored captured CO2 (359,777 t per year), while abatement, the transport and storage tonnage and the capture capital use the plant's 363,277 t per year, 0.97 percent more. A validation row prints the reboiler duty that the plant's own capture would imply.
-- The GAS line of the cost ledger keeps INL's 52.5 MMSCFD reference gas. The central intensity implies 35.09 MMSCFD at Case B against 35.87 for INL scaled, and a validation row prints the gap.
+- The GAS line of the cost ledger first kept INL's 52.5 MMSCFD reference gas, while the central intensity implies 35.09 MMSCFD at Case B against 35.87 for INL scaled. Fix round 1 below replaces this: the ledger prices the implied gas.
 - The site scripts (`build_numbers.py`, `build_site.py`, `check_site.py`) and the frontend labels still describe the INL headline. They belong to Phases 5 and 6.
 
 Tests run on the final tree of this track: `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` passed, `cargo test --workspace` passed 462 tests with none failed, the default export agrees with `results/` in all eight tables, and the export with `--basis legacy` agrees with the snapshot of main 8750b09 in the seven tables it holds (650 validation rows, of which 325 pass, 32 fail, 251 are reported and 42 are not run, as at the baseline). The default export has 668 validation rows: 331 pass, 32 fail, 263 reported and 42 not run.
 
 Failures: none new. The 32 failed literature benchmarks stay failed. Two of the new validation rows are reported comparisons with the copied INL values (net abatement 557,767 t per year against 578,052, and the 578,000 band of the drift check) and carry no limit.
+
+## Phase 3, fix round 1: carbon track (findings of the independent verifier)
+
+Two major findings of the verifier were fixed on the existing build. Nothing else was changed.
+
+Finding 1, the cost per tonne still depended on a copied INL plant result. The L0 GAS line, the gas lines of the discounted cash flow, the saved upstream gas of the lifecycle view and the gas keys of the case summary priced the gas saved against INL's conventional-plant gas (`NG_CONV_NOCC`, 52.5 MMSCFD scaled to the plant), while the abatement reference is the central intensity. The two used unlike reference plants.
+
+- `Model::reference_gas_mmscfd` and `Model::reference_carbon` (equations N.7.3 and N.9.2) now give the one reference gas of the independent basis: the carbon identity of N.7.3 solved for the gas that the central intensity implies. The ledger, the DCF, the lifecycle credit, the case summary and the decomposition all read it, so rule 1 of the boundary table of N.7 holds and a test compares the gas line with the decomposition to 1e-12. On the legacy basis the function returns INL's gas with the same floating-point expression as before.
+- INL's 52.5 MMSCFD is kept as `NG_CONV_NOCC` for the legacy basis and as a comparison input of the cost (`CostQuery::ng_smr`). Three reported validation rows (`IND_GAS_LINE_UNDER_INL_GAS`, `IND_L5_UNDER_INL_GAS`, `IND_LAC_DCF_UNDER_INL_GAS`) print the cost under INL's gas beside the default. A test shows that the implied gas reproduces INL's gas within 0.5 percent when it is fed INL's own intensity.
+- Effect on B_REC_F, BOAK, 25 y, n = 1.0: the implied reference gas is 35.092267 MMSCFD (INL scaled: 35.872251). The L0 GAS line moves from -65.478036 to -61.479836 S$M/y, L5 from 196.012113 to 203.180333 S$/t (+7.168220) and LAC_DCF from 196.332684 to 203.500904 S$/t. The abatement is unchanged at 557,767.415516 t/y. The break-even share of the progressive grant (both methods) moves from 0.643381 to 0.691256 for definition A and from 0.480129 to 0.515856 for definition B. Seventeen grid points of `Subsidy_Scenarios.csv` change `target_met` from true to false.
+- The LOST_STEAM and BASE_POWER lines still use INL's conventional-plant steam and power (`EXPORT_STEAM_CONV`, `E_CONV_NOCC`). The verifier did not raise them and no source exists for a plant-built reference duty (`REF_STEAM_DUTY`); they stay as they were and are listed as open.
+
+Finding 2, a CO2e quantity sat among CO2 rows. `EF_UPSTREAM` is 11.5 kg CO2e per GJ at a 100-year potential of 30 (IEA 2026, PDF pp. 4 and 6) and `EF_NUCLEAR` is a CO2e range of UNECE 2021 read through a secondary summary, with no horizon stated. Both enter the lifecycle views, whose rows carried the status `carbon_independent`, the source text of the CO2 ledger and no horizon.
+
+- The fields of `Lifecycle` are now `up_credit_co2e` and `nuclear_co2e`. On the independent basis every row of `lifecycle_burdens` and `lifecycle_upstream` in `Emissions_Ledger.csv` says CO2e in its line text, names the horizon (`GWP100 = 30`) for the upstream term and says that the horizon of the nuclear range is not stated, and the source text names both factors. The transport and storage burden row says CO2. The legacy rows keep their committed wording.
+- The registry gains `EF_UPSTREAM_GWP100` (30, published, IEA 2026 p. 6) as the label of `EF_UPSTREAM`; the unit and text of `EF_UPSTREAM` itself are untouched, so the legacy snapshot comparison still agrees. The wasm label of `abatement_lifecycle_t_y` says CO2e total.
+- The split of `EF_UPSTREAM` into a CO2 part and a CH4 part, which N.9.5 asks for, was not done. The sources read state the intensity only as one CO2e total, and any split would need an invented share. The aggregate enters the CO2 slot of the closed form with the methane term at zero; a test shows that the exported lifecycle view equals `closed_form::lifecycle` on that factor. The split stays an open item (open issue 6 of the derivation).
+- The guard test `no_co2e_quantity_appears_without_a_label_in_any_view` now walks every `lifecycle_*` view of every run on the plant ledger (126 rows, whatever status word a preset gave them) and checks every other view for the CO2e word. Applied to the committed table from before the fix it flags all 90 lifecycle rows that carry a CO2e term and no label.
+
+Cells of `results/` that changed, and why:
+
+- `Economic_Ledger.csv`: the L0 GAS value, low and high cells (88 cells) and every cumulative cell from L0 upward (1,232 cells in each of the two cumulative columns), the `dcf_value` cells (232) and one status cell (`LAC_L5_GAP_REL`, B_REC_F, 10OAK_P47, 40 y, from `gated_T05` to `anchored_port`, because the gap between the Headline and Anchored presets fell below the printed digits).
+- `Emissions_Ledger.csv`: the line text of the 126 lifecycle rows, the source text of the 90 of them that carry a CO2e term (the 36 transport and storage rows are CO2 and keep their source), and the values of the 36 rows `UPSTREAM_CREDIT` and `ABATEMENT` of `lifecycle_upstream` with the matching per-kg cells (the saved upstream gas follows the implied reference gas).
+- `Final_Design_Basis.csv`: 58 result rows (`AC_L3_*`, `AC_L5_*`, `LAC_DCF_*`, `LCOH_SMR_*`, the target-excess rows, `RES_NG_UNABATED_MMSCFD` and `RES_GAS_SAVING_INL`) and one new input row, `EF_UPSTREAM_GWP100`.
+- `Sensitivity_Results.csv`: 619 result cells, all through the gas line and the L5 and DCF denominators of the cost sweeps.
+- `Subsidy_Scenarios.csv`: every cost, interest, share and verdict cell that depends on the cost, including the 32 break-even shares.
+- `Validation_Results.csv`: three new reported rows, a new explanation for `IND_REF_GAS_IMPLIED_VS_INL` and the registry entry count in `PARAMS_COMPLETE`.
+- `Integrated_Mass_Balance.csv` and `Integrated_Energy_Balance.csv` are byte-identical.
+
+Test fixture: `ten_oak_at_25_gas_reads_one_verdict` in the wasm tests needs a point that sits below the target. The old fixture (stage 10OAK_P46, gas at the control maximum of S$25/GJ) now reads 102.9 and 103.2 S$/t, so the fixture adds transport and storage at S$40/t (89.9 and 90.1 S$/t). No tolerance was changed.
+
+Tests run on the final tree of this fix round: `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` passed, `cargo test --workspace` passed 468 tests with none failed, the default export agrees with `results/` in all eight tables, and the export with `--basis legacy` agrees with the snapshot of main 8750b09 in the seven tables it holds (650 validation rows: 325 pass, 32 fail, 251 reported, 42 not run, as at the baseline). The default export has 671 validation rows: 331 pass, 32 fail, 266 reported, 42 not run. `scripts/check_clean.py` scanned 245 files with 0 hits.
+
+Outstanding after this round:
+
+- LOST_STEAM and BASE_POWER still price INL's conventional-plant steam and power. They are the same kind of copied value as the gas was. No source exists for a plant-built reference duty, so they stay and are listed for the owner to decide.
+- The CO2 and CH4 split of `EF_UPSTREAM` waits for a source that states it; the heating-value basis of the factor is not stated either.
+- `math/verify/sympy_subsidy.py`: check C19 (a case with the abatement doubled, which expected a negative break-even share at the old cost level) now finds a small positive share, because the corrected L5 is above S$100/t at that rescaling; its fixture factor needs a larger value. Check C15b carries the literal 37.985 S$/t, which belongs to the legacy abatement and had already stopped matching when the independent abatement became the default. `math/verify/sympy_carbon.py` has seven checks that compare legacy values with `results/`, which now holds the independent basis; they should read `engine/vv/data/legacy_results/`. These scripts are outside this fix and were not changed.
+- The frontend and site scripts still describe the INL headline and the lifecycle KPI without the CO2e wording (Phases 5 and 6).
+
+Failures: none new. The 32 failed literature benchmarks stay failed.
 
 ## Phase status
 

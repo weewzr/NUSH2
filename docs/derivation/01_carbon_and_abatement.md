@@ -752,9 +752,9 @@ $$E_{ref}=\frac{M_{CO_2}\,t_h}{1000}\Big[\bar c\,(\dot n_{proc}+\dot n_{fuel})-P
 
 Result type: analytical.
 
-Rust implementation: `Model::abatement` in `engine/plant/src/abatement.rs` (row `PLANT_FLOOR` from the reference ledger, rows `IEAGHG_9p00`, `INL_9p21` and `CHO_9p35` from the published intensities times the annual hydrogen) and `Model::emissions` (fields `baseline_central`, `baseline_id`).
+Rust implementation: `Model::abatement` in `engine/plant/src/abatement.rs` (row `PLANT_FLOOR` from the reference ledger, rows `IEAGHG_9p00`, `INL_9p21` and `CHO_9p35` from the published intensities times the annual hydrogen) and `Model::emissions` (fields `baseline_central`, `baseline_id`). `Model::reference_carbon` and `Model::reference_gas_mmscfd` turn the central intensity into the carbon and the gas of the unabated reference (the carbon identity of this equation solved for the gas); the GAS line of the cost ledger, the saved upstream gas of the lifecycle view and the avoided-gas term of N.9.2 all read that gas. INL's 52.5 MMSCFD is a comparison input of the cost (`CostQuery::ng_smr`) and the legacy value.
 
-Validation test: `eq_n_7_3_reference_identity_on_the_inl_gas_flows` and the validation rows `IND_N73_INL_UNABATED` and `IND_N73_INL_HTGR_NOCC` in `engine/plant/tests/m11_carbon.rs`.
+Validation test: `eq_n_7_3_reference_identity_on_the_inl_gas_flows` `the_implied_gas_reproduces_inls_gas_when_given_inls_intensity`, `inls_reference_gas_is_a_comparison_with_a_reported_cost_effect` and the validation rows `IND_N73_INL_UNABATED`, `IND_N73_INL_HTGR_NOCC`, `IND_GAS_LINE_UNDER_INL_GAS`, `IND_L5_UNDER_INL_GAS` and `IND_LAC_DCF_UNDER_INL_GAS` in `engine/plant/tests/m11_carbon.rs` and `engine/vv/src/harness.rs`.
 
 ## Equation N.7.4: steam and power terms of the system view
 
@@ -792,7 +792,7 @@ Both plants take the same gas composition at the battery limit and deliver the s
 | CO2 to storage | none | $C$ | through N.9.2 | through N.9.2 | capture and transport and storage lines |
 
 Four rules follow.
-1. One source for the gas difference. The GAS line is the price times $\dot n_{ref}-\dot n_{NG}$ (`economics.rs:254`, `335`) and the avoided-gas carbon in N.9.2 is $\bar c(\dot n_{ref}-\dot n_{NG})$. Both must read the same two numbers, taken from N.1.5 and N.7. A test in Phase 4 compares them.
+1. One source for the gas difference. The GAS line is the price times $\dot n_{ref}-\dot n_{NG}$ (`Model::cost_items` and `Model::ledger` in `engine/plant/src/economics.rs`) and the avoided-gas carbon in N.9.2 is $\bar c(\dot n_{ref}-\dot n_{NG})$. Both must read the same two numbers, taken from N.1.5 and N.7. The test `rule_1_of_n_7_the_gas_line_the_decomposition_and_the_lifecycle_read_one_gas_difference` compares them, and the saved upstream gas of the lifecycle view (N.9.5) reads the same difference.
 2. The system terms $E_{lost}$ and $E_{pow}$ are added once, and only in the system view. They are never folded into $E_{ref}$. The fuel burned for the reference's exported steam stays inside $E_{ref}$ in the direct view, and $E_{lost}$ removes the same energy once in the system view.
 3. Pair the cost level with the carbon view. The ladder from L0 to L5 reaches L5 only after adding LOST_STEAM and BASE_POWER, whose carbon consequences exist only in $A_{sys}$. The legacy headline divides L5 by the direct abatement, which uses a carbon boundary that leaves those two items out while the cost includes them. On the legacy B_REC_F row the system abatement is 527631.56 against 578051.61, 8.72 percent smaller, so the same cost over $A_{sys}$ is 9.6 percent higher. This is a mismatch of boundaries and leaves nothing counted twice; it is listed as open issue 3 for a decision.
 4. Equal products. The two plants must share the same hydrogen flow and the same product CH4, so that $P$ cancels in N.9.2. A reference built for a different purity would add a term $k(P_{ref}-P)$ that the formula does not contain.
@@ -908,9 +908,9 @@ Scope of the decomposition. It uses the closure of the modelled streams. If an u
 
 Lower bound for the present flowsheet run: with $\dot n_{ref}\ge1223.99\ \mathrm{kmol\ h^{-1}}$ (N.7.1) and $v=1$, $A_{dir}\ge327.695\times[1108.584+1.05379\times(1223.99-1150.37)]=388700\ \mathrm{t\ y^{-1}}$. It assumes the cryogenic inputs of that run and a reference with no firing gas and complete conversion; it is a floor and not an estimate.
 
-Rust implementation: `Decomposition` built in `Model::abatement` in `engine/plant/src/abatement.rs`.
+Rust implementation: `Decomposition` built in `Model::abatement` in `engine/plant/src/abatement.rs`, with the reference carbon and gas from `Model::reference_carbon` and `Model::reference_gas_mmscfd` (the gas of the GAS line, rule 1 of N.7).
 
-Validation test: `eq_n_9_2_decomposition_of_the_direct_abatement` in `engine/plant/tests/m11_carbon.rs`.
+Validation test: `eq_n_9_2_decomposition_of_the_direct_abatement` and `rule_1_of_n_7_the_gas_line_the_decomposition_and_the_lifecycle_read_one_gas_difference` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.3: capture-based abatement
 
@@ -974,9 +974,9 @@ $$A_{LC}=A_{TS}+\Delta G\,\big(e_{up,CO_2}+GWP_H\,e_{up,CH_4}\big)-E_{nuc}$$
 
 Result type: analytical. No value of $GWP_H$ is assumed in this file; the horizon and the report that supplies it are a owner decision (open issue 6).
 
-Rust implementation: `Model::lifecycle_terms` in `engine/plant/src/emissions.rs` (the CO2 view) and `closed_form::lifecycle` in `engine/plant/src/abatement.rs`. No value of the warming potential exists in the repository, so the exports carry the CO2 view and the CO2e term stays at its zero default.
+Rust implementation: `Model::lifecycle_terms` in `engine/plant/src/emissions.rs` and `closed_form::lifecycle` in `engine/plant/src/abatement.rs`. The sources read state the upstream intensity only as one CO2e total (`EF_UPSTREAM`, 11.5 kg CO2e per GJ at a 100-year potential of 30, IEA 2026, labelled by the parameter `EF_UPSTREAM_GWP100`), so $e_{up,CO_2}$ and $e_{up,CH_4}$ cannot be separated without an invented share. The total enters the CO2 slot of the formula with the methane term at zero. The fields are named `up_credit_co2e` and `nuclear_co2e`, the nuclear factor is also a CO2e range whose horizon the source read does not state, and every row of the two lifecycle views of the emissions table says CO2e with the horizon and the source. The saved gas $\Delta G$ is priced on the reference gas of rule 1 of N.7.
 
-Validation test: `eq_n_9_5_lifecycle_view_counts_transport_and_storage_once` in `engine/plant/tests/m11_carbon.rs`.
+Validation test: `eq_n_9_5_lifecycle_view_counts_transport_and_storage_once`, `eq_n_9_5_the_exported_lifecycle_is_the_closed_form_on_the_aggregate_factor` and `no_co2e_quantity_appears_without_a_label_in_any_view` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.10.1: abatement per kg of hydrogen
 
@@ -1246,11 +1246,11 @@ Each test names the equation it checks and the tolerance on the quantity. Full-p
 # Open issues
 
 1. **Central values of $f$ and $r$.** The plant's own atom balances determine everything downstream of the cryogenic split and nothing about the split itself. Both inputs are still calibrated to INL numbers, and the back-calculation of $f$ is ill conditioned (N.4.3). The owner has to choose a design basis for the cryogenic unit; N.2.1, N.2.2 and N.4.4 give the response in closed form (at the present carbon shares and the fixed hydrogen output, the stack carbon falls by 1205 $\mathrm{t\ y^{-1}}$ for each 0.01 of $f$; the $B_H(f)$ form of N.4.4 includes the change of the gas rate), so the choice can be scanned before it is fixed, or set through a target stack carbon or a target $\beta$.
-2. **Reference furnace.** N.7.2 needs $\eta_F$ and the net steam-system duty, and Phase 3 needs a no-capture, no-recycle configuration of the flowsheet. Until then the reference gas is the legacy INL value or the floor of N.7.1.
+2. **Reference furnace.** N.7.2 needs $\eta_F$ and the net steam-system duty, and Phase 3 needs a no-capture, no-recycle configuration of the flowsheet. Until then the reference gas is the gas that the central intensity implies (rule 1 of N.7) or the floor of N.7.1, and INL's gas is a comparison row.
 3. **Pairing of the cost level with the carbon view.** L5 contains LOST_STEAM and BASE_POWER; the direct abatement does not contain their carbon. Decide which pair is the headline (L5 with $A_{sys}$, or the ladder without those two lines with $A_{dir}$) and report the other as a second row.
 4. **Capture efficiency.** $\eta$ stays a specification while gate M6 (term T02) is failed.
 5. **Unknown streams.** U1, U2 and U6 need sourced bounds; the fate $v$ of the condensate CO2 needs confirmation.
-6. **Gas basis.** Choose the horizon $H$ and the source of $GWP_H$ (decision D4), split `EF_UPSTREAM` by gas and state its heating-value basis.
+6. **Gas basis.** Choose the horizon $H$ and the source of $GWP_H$ (decision D4), split `EF_UPSTREAM` by gas and state its heating-value basis. Status: the aggregate now carries its horizon and source (100-year potential of 30, IEA 2026) and the lifecycle rows say CO2e; the split by gas and the heating-value basis wait for a source that states them.
 7. **Transport and storage inputs** wait for the transport and storage research.
 8. **Inputs outside `parameters.toml`.** The N2 and O2 fractions, S/C, reformer temperature and pressure live in `flowsheet.rs`. The ids `C_PER_MOL_NG_*` hold mole fractions despite their names.
 9. **Blocking checks.** `drift.rs` pins the abatement at 578000 plus or minus 12000 t/y; it would block any independent rebuild and should become a non-blocking validation row. The tests that compare the flowsheet with the anchored ledger will fail by design with the independent basis.
