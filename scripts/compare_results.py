@@ -9,6 +9,15 @@ the six decimals the ledgers print, so round-off residuals of order 1e-9 that
 the solvers leave in closure and error columns compare as equal; and a
 relative 1e-9. Columns named in --ignore (default: commit) are skipped.
 
+--names restricts the comparison to the named files. --subset compares by key
+instead of by position: every row of the reference folder must be present in
+the regenerated folder with the same cells, and rows that only the regenerated
+folder holds are counted and not failed. It is the mode that compares a
+regenerated legacy export with the snapshot under engine/vv/data/legacy_results,
+since later work adds rows to the tables. --allow-cell FILE:KEY:COLUMN names one
+cell that may differ in subset mode, such as a count of registry entries that
+grows when an input is added.
+
 Usage: python scripts/compare_results.py results target/results
 Exit 0 when the folders agree, 1 on any difference or missing file.
 """
@@ -95,6 +104,69 @@ def compare(name, a_rows, b_rows, ignore, limit, abs_tol=ABS):
     return out, cells, flips
 
 
+# Leading columns that identify a row of each table, for --subset.
+KEY_COLUMNS = {
+    "Economic_Ledger.csv": 7,
+    "Emissions_Ledger.csv": 4,
+    "Final_Design_Basis.csv": 1,
+    "Integrated_Energy_Balance.csv": 2,
+    "Integrated_Mass_Balance.csv": 2,
+    "Sensitivity_Results.csv": 7,
+    "Subsidy_Scenarios.csv": 4,
+    "Validation_Results.csv": 1,
+}
+
+
+def keyed(rows, width):
+    """Map (key cells, occurrence) to row, so repeated keys stay distinct."""
+    out = {}
+    seen = {}
+    for row in rows[1:]:
+        key = tuple(row[:width])
+        n = seen.get(key, 0)
+        seen[key] = n + 1
+        out[(key, n)] = row
+    return out
+
+
+def compare_subset(name, a_rows, b_rows, ignore, limit, abs_tol, allowed):
+    """Every reference row must be in the regenerated table with equal cells."""
+    if not a_rows or not b_rows:
+        return [f"{name}: empty file"], 0, 0, 0
+    ha, hb = a_rows[0], b_rows[0]
+    missing_cols = [h for h in ha if h not in hb]
+    if missing_cols:
+        return [f"{name}: columns missing from the regenerated table: {missing_cols}"], 0, 0, 0
+    width = KEY_COLUMNS.get(name, 1)
+    ka, kb = keyed(a_rows, width), keyed(b_rows, width)
+    out = []
+    cells = flips = 0
+    col_b = {h: i for i, h in enumerate(hb)}
+    for (key, n), ra in ka.items():
+        rb = kb.get((key, n))
+        label = ",".join(key[:2])
+        if rb is None:
+            out.append(f"{name} [{label}] occurrence {n}: row missing from the regenerated table")
+        else:
+            for i, h in enumerate(ha):
+                if h in ignore:
+                    continue
+                x, y = ra[i], rb[col_b[h]]
+                cells += 1
+                ok, numeric = same(x, y, abs_tol)
+                if ok and numeric and x != y:
+                    flips += 1
+                if not ok and (name, key[0], h) in allowed:
+                    continue
+                if not ok:
+                    out.append(f"{name} [{label}] {h}: {x!r} against {y!r}")
+        if len(out) >= limit:
+            out.append(f"{name}: further differences not listed")
+            return out, cells, flips, 0
+    extra = len(set(kb) - set(ka))
+    return out, cells, flips, extra
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("a", type=Path, help="reference folder, normally results")
@@ -102,8 +174,25 @@ def main(argv=None):
     ap.add_argument("--ignore", nargs="*", default=["commit"], help="column names to skip")
     ap.add_argument("--limit", type=int, default=40, help="differences listed per file")
     ap.add_argument("--abs", type=float, default=ABS, dest="abs_tol", help="absolute tolerance, default 1e-6")
+    ap.add_argument("--names", nargs="*", default=None, help="compare only these file names")
+    ap.add_argument("--subset", action="store_true", help="keyed compare; rows only in b are counted, not failed")
+    ap.add_argument(
+        "--allow-cell",
+        action="append",
+        default=[],
+        metavar="FILE:KEY:COLUMN",
+        help="a cell that may differ in --subset mode, named by file, first key cell and column",
+    )
     args = ap.parse_args(argv)
     names = sorted({p.name for p in args.a.glob("*.csv")} | {p.name for p in args.b.glob("*.csv")} | set(EXPECTED))
+    if args.names is not None:
+        names = sorted(args.names)
+    allowed = set()
+    for spec in args.allow_cell:
+        parts = spec.split(":")
+        if len(parts) != 3:
+            ap.error(f"--allow-cell wants FILE:KEY:COLUMN, got {spec!r}")
+        allowed.add(tuple(parts))
     fails = []
     for name in names:
         pa, pb = args.a / name, args.b / name
@@ -111,6 +200,19 @@ def main(argv=None):
             missing = [str(p) for p in (pa, pb) if not p.is_file()]
             fails.append(f"{name}: missing in {', '.join(missing)}")
             print(f"{name}: MISSING")
+            continue
+        if args.subset:
+            diffs, cells, flips, extra = compare_subset(
+                name, read(pa), read(pb), set(args.ignore), args.limit, args.abs_tol, allowed
+            )
+            state = "differs" if diffs else "agrees"
+            print(
+                f"{name}: {state}, {cells} cells compared, {flips} unequal as text but within "
+                f"tolerance, {extra} rows only in the regenerated table"
+            )
+            for d in diffs:
+                print(f"  {d}")
+            fails.extend(diffs)
             continue
         diffs, cells, flips = compare(name, read(pa), read(pb), set(args.ignore), args.limit, args.abs_tol)
         state = "differs" if diffs else "agrees"
