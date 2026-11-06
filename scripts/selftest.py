@@ -34,6 +34,7 @@ Exit 0 on pass, 1 on any failure, Chrome missing included.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -157,6 +158,62 @@ def stop_browser(browser, dport):
         browser.wait()
 
 
+DEVTOOLS_LINE = re.compile(rb"DevTools listening on ws://[^:/]+:(\d+)/")
+
+
+def devtools_port(profile, logpath):
+    """The DevTools port Chrome bound, from the DevToolsActivePort file in its
+    profile folder or from the 'DevTools listening on' line of its log."""
+    portfile = profile / "DevToolsActivePort"
+    try:
+        first = portfile.read_text(encoding="utf-8", errors="replace").splitlines()[:1]
+        if first and first[0].strip().isdigit():
+            return int(first[0])
+    except OSError:
+        pass
+    try:
+        m = DEVTOOLS_LINE.search(logpath.read_bytes())
+    except OSError:
+        return None
+    return int(m.group(1)) if m else None
+
+
+def start_browser(cmd, tmp, attempts=3, wait_s=45):
+    """Start Chrome and return (browser, dport, targets, log, logpath).
+
+    Chrome is given port 0 and picks a free DevTools port itself, so no port is
+    chosen in advance that another process could take in between. A start that
+    shows no page target within wait_s seconds is stopped, its log tail is
+    printed, and Chrome is started again with a fresh profile."""
+    for n in range(1, attempts + 1):
+        profile = Path(tmp) / f"profile{n}"
+        logpath = Path(tmp) / f"chrome{n}.log"
+        (profile / "DevToolsActivePort").unlink(missing_ok=True)
+        log = open(logpath, "wb")
+        browser = subprocess.Popen(cmd + [f"--user-data-dir={profile}", "--remote-debugging-port=0",
+                                          "about:blank"], stdout=subprocess.DEVNULL, stderr=log)
+        t0, dport = time.time(), None
+        while time.time() - t0 < wait_s and browser.poll() is None:
+            dport = devtools_port(profile, logpath)
+            if dport:
+                try:
+                    targets = get_json(f"http://127.0.0.1:{dport}/json/list", tries=5)
+                except TimeoutError:
+                    targets = []
+                if any(t.get("type") == "page" for t in targets):
+                    return browser, dport, targets, log, logpath
+            time.sleep(0.25)
+        code = browser.poll()
+        stop_browser(browser, dport or 0)
+        log.close()
+        tail = logpath.read_bytes().decode("utf-8", "replace").strip().splitlines()[-8:]
+        state = f"exited with code {code}" if code is not None else f"no page target within {wait_s} s"
+        print(f"note: Chrome start {n} of {attempts}: {state}, DevTools port {dport}")
+        for line in tail:
+            print(f"chrome: {line}")
+    raise TimeoutError(f"Chrome showed no DevTools page target in {attempts} starts")
+
+
 def run(args):
     site = args.site.resolve()
     if not (site / "index.html").is_file():
@@ -171,7 +228,7 @@ def run(args):
     if args.expect_commit and build.get("commit") != args.expect_commit:
         fails.append(f"build.json commit {build.get('commit')} differs from the expected {args.expect_commit}")
 
-    port, dport = free_port(), free_port()
+    port = free_port()
     server = ThreadingHTTPServer(("127.0.0.1", port), partial(Quiet, directory=str(site)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -180,13 +237,16 @@ def run(args):
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         cmd = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
                "--disable-extensions", "--disable-background-networking", "--disable-component-update",
-               "--disable-sync", f"--user-data-dir={Path(tmp) / 'profile'}", f"--remote-debugging-port={dport}"]
+               "--disable-sync"]
         if args.no_sandbox:
             cmd.append("--no-sandbox")
-        log = open(Path(tmp) / "chrome.log", "wb")
-        browser = subprocess.Popen(cmd + ["about:blank"], stdout=subprocess.DEVNULL, stderr=log)
         try:
-            targets = get_json(f"http://127.0.0.1:{dport}/json/list")
+            browser, dport, targets, log, logpath = start_browser(cmd, tmp)
+        except TimeoutError as e:
+            server.shutdown()
+            print(f"FAIL: {e}")
+            return 1
+        try:
             page = next(t for t in targets if t.get("type") == "page")
             s = Session(WebSocket(page["webSocketDebuggerUrl"]))
             for dom in ("Runtime.enable", "Log.enable", "Page.enable", "Network.enable"):
@@ -222,7 +282,7 @@ def run(args):
         finally:
             stop_browser(browser, dport)
             log.close()
-            err = (Path(tmp) / "chrome.log").read_bytes()
+            err = logpath.read_bytes()
             server.shutdown()
     if state not in ("pass", "fail"):
         tail = (err or b"").decode("utf-8", "replace").strip().splitlines()[-5:]
