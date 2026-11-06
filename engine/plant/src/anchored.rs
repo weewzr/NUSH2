@@ -8,6 +8,7 @@
 
 use crate::heatrec;
 use crate::params::{ParamSet, Reader};
+use crate::subsidy::SubsidyParams;
 use crate::utility::{self, ReactorTerms};
 use nush2_numerics::{fixed_point, EngineError, Result};
 use nush2_props::units::{
@@ -317,6 +318,8 @@ pub struct Model {
     pub scale_t04: f64,
     pub scale_t07: f64,
     pub scale_t08: f64,
+    /// Inputs of the co-funding model (`crate::subsidy`).
+    pub subsidy: SubsidyParams,
 }
 
 /// Inputs of the independent WGS-EX4 cooling curve check.
@@ -876,6 +879,7 @@ impl Model {
             scale_t04: r.term_scale("T04"),
             scale_t07: r.term_scale("T07"),
             scale_t08: r.term_scale("T08"),
+            subsidy: SubsidyParams::read(r)?,
         })
     }
 

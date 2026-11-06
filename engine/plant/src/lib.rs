@@ -16,6 +16,7 @@ pub mod gates;
 pub mod heatrec;
 pub mod params;
 pub mod sens;
+pub mod subsidy;
 pub mod terms;
 pub mod utility;
 

@@ -58,9 +58,12 @@ fn working_key(word: &str) -> bool {
 }
 
 /// Markdown files a source string may name: the public docs of the repository.
-const PUBLIC_MD: [&str; 2] = [
+const PUBLIC_MD: [&str; 5] = [
     "docs/final_design_decisions.md",
     "docs/validation_matrix.md",
+    "docs/abatement_subsidy_log.md",
+    "docs/abatement_subsidy_references.md",
+    "docs/derivation/02_cost_and_subsidy.md",
 ];
 
 /// A Markdown or Python file named in a line that is not a public repository
@@ -119,6 +122,12 @@ fn the_detector_sees_each_pattern() {
     assert!(hits("x", "TEV-961 Table 2 doc p16 (PDF p17), 5 s spacing").is_empty());
     assert!(hits("x", "engine/vv/data/freeze_values.json").is_empty());
     assert!(hits("x", "decision S11, docs/VALIDATION_MATRIX.md").is_empty());
+    assert!(hits("x", "decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md").is_empty());
+    assert!(hits(
+        "x",
+        "equation S.2 of docs/derivation/02_cost_and_subsidy.md"
+    )
+    .is_empty());
     assert!(hits("x", "built by scripts/build_numbers.py").is_empty());
     assert!(hits("x", "Khan prints no critical surface tension").is_empty());
 }

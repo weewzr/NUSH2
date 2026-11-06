@@ -2468,6 +2468,294 @@ locator = "author decision"
 source_status = "primary"
 
 [[param]]
+id = "SUBSIDY_SHARE_GRID_1"
+value = 0.0
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 1"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_2"
+value = 0.25
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 2"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_3"
+value = 0.5
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 3"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_4"
+value = 0.75
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure; the 75 percent case is a stress case, because no plant-capital precedent was found"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 4"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_REACTOR"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item reactor_capital (the reactor overnight capital); 1 means eligible, 0 means outside the grant. In definition A this item is eligible"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, reactor overnight capital"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_IHX"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item ihx_capital (the intermediate heat exchanger); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, intermediate heat exchanger"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_LICENCE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item licence_capital (the licence); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, licence"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_POWER_ISLAND"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item power_island_capital (the power island); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, power island"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_CAPTURE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item capture_capital (the capture plant); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, capture plant"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_RECYCLE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item recycle_capital (the recycle train); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, recycle train"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_REACTOR"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item reactor_capital (the reactor overnight capital); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, reactor overnight capital"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_IHX"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item ihx_capital (the intermediate heat exchanger); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, intermediate heat exchanger"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_LICENCE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item licence_capital (the licence); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, licence"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_POWER_ISLAND"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item power_island_capital (the power island); 1 means eligible, 0 means outside the grant. P4 in docs/ABATEMENT_SUBSIDY_REFERENCES.md lists power generation assets as ineligible, and decision D7b leaves the power island out"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, power island"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_CAPTURE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item capture_capital (the capture plant); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, capture plant"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_RECYCLE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item recycle_capital (the recycle train); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, recycle train"
+
+[[param]]
+id = "SUBSIDY_DEFAULT_DEFINITION"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Default eligible set of the co-funding scenarios, project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 selects definition A (reactor only), 1 selects definition B. The exported table prints both definitions"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy default eligibility definition"
+
+[[param]]
+id = "SUBSIDY_DEFAULT_TIMING"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Default grant timing of the co-funding scenarios, project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 selects a progressive grant paid pro rata with the eligible spend, 1 selects a grant paid at financial close. The exported table prints both timings"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy default grant timing"
+
+[[param]]
+id = "SUBSIDY_SHARE_MAX"
+value = 1.0
+unit = "-"
+group = "cost"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "A share is a fraction of eligible expenditure and cannot exceed 1 (equation S.2 of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equation S.2"
+source_status = "primary"
+name = "Subsidy share upper limit"
+
+[[param]]
+id = "SUBSIDY_SOLVER_TOL"
+value = 1e-12
+unit = "-"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: bracketing tolerance of the bisection fallback for the break-even share (equation S.7d of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equation S.7d"
+source_status = "not_verified"
+name = "Subsidy break-even bisection tolerance"
+
+[[param]]
+id = "SUBSIDY_RESIDUAL_TOL"
+value = 1e-9
+unit = "S$/t"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: largest distance between the cost at a closed-form break-even share and the target before the bisection fallback takes over (equations S.7b to S.7d of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equations S.7b to S.7d"
+source_status = "not_verified"
+name = "Subsidy break-even residual tolerance"
+
+[[param]]
+id = "SUBSIDY_GRANT_CASH_RATE"
+value = 0.0
+unit = "1/y"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: grant cash that has arrived and is not yet spent earns nothing (convention 3 in docs/derivation/02_cost_and_subsidy.md). Only 0 is implemented; equation S.3d gives the bound at the discount rate"
+locator = "convention 3, equation S.3d"
+source_status = "not_verified"
+name = "Subsidy return on idle grant cash"
+
+[[param]]
+id = "SUBSIDY_IDC_BASIS"
+value = 2.0
+unit = "-"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: interest during construction is charged on the private balance outstanding, basis 2 of equation S.5a in docs/derivation/02_cost_and_subsidy.md. Basis 1 is the gross spend and basis 3 is the part the grant saves, which is reported and never an input. Only basis 2 is implemented"
+locator = "equation S.5a"
+source_status = "not_verified"
+name = "Subsidy interest during construction basis"
+
+[[param]]
+id = "SUBSIDY_GAP_LIMIT"
+value = 0.01
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Largest accepted gap between the ledger and the discounted cash flow at a subsidised point, as a share of the ledger cost: 1 percent (project decision D11 in docs/ABATEMENT_SUBSIDY_LOG.md). The comparison with the gap predicted by the derivation is a separate check"
+locator = "decision D11"
+source_status = "primary"
+name = "Subsidy ledger and cash flow gap limit"
+
+[[param]]
 id = "SMR_ISLAND_TCR_EURM"
 value = 222.89
 unit = "EUR2014 M"
