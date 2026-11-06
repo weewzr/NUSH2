@@ -147,7 +147,7 @@ fn parameters_and_results_cite_no_working_note() {
         .filter(|p| p.extension().is_some_and(|x| x == "csv"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 7, "{files:?}");
+    assert_eq!(files.len(), 8, "{files:?}");
     for f in files {
         let text = std::fs::read_to_string(&f).expect("results file");
         let name = f.file_name().unwrap().to_string_lossy().to_string();

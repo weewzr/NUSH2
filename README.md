@@ -56,7 +56,7 @@ Each step changes one condition of the step above it (rows `STEPDOWN_` of `resul
 |---|---|
 | `engine/` | Rust workspace of the engine, one crate per layer (table below) |
 | `engine/data/parameters.toml` | Every input number, each with its class, rigour, source, locator and decision |
-| `results/` | The seven CSV files that `nush2 export` writes: design basis, mass and energy balances, emissions and economic ledgers, sensitivities and validation |
+| `results/` | The eight CSV files that `nush2 export` writes: design basis, mass and energy balances, emissions and economic ledgers, sensitivities, government co-funding scenarios and validation |
 | `frontend/` | The browser simulator: static HTML, CSS and JavaScript around the WebAssembly engine |
 | `math/` | First-principles derivations: LaTeX source, equation register and the built PDF |
 | `scripts/` | Python build and check scripts, standard library only |

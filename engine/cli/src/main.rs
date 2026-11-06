@@ -1,6 +1,6 @@
 //! `nush2` command line. The only crate that touches the disk.
 //!
-//! nush2 export --out results     write the seven CSVs
+//! nush2 export --out results     write the eight CSVs
 //! nush2 json --preset headline   print one plant run as JSON
 //! nush2 drift [--markdown]       print Headline against Modelled and the
 //!                                section 7 checks
@@ -68,6 +68,7 @@ fn export(out: &str) -> Result<()> {
     write(dir, "Emissions_Ledger.csv", &t.emissions_ledger)?;
     write(dir, "Economic_Ledger.csv", &t.economic_ledger)?;
     write(dir, "Sensitivity_Results.csv", &t.sensitivity_results)?;
+    write(dir, "Subsidy_Scenarios.csv", &t.subsidy_scenarios)?;
     write(dir, "Validation_Results.csv", &nush2_vv::report::csv(&rows))?;
     let count = |s: Status| rows.iter().filter(|r| r.status == s).count();
     println!(

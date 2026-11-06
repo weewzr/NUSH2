@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Number map: read the seven results CSVs, write build/numbers.json.
+"""Number map: read the eight results CSVs, write build/numbers.json.
 
 This file is the only route by which a result reaches a document. It is a pure
 function of results/*.csv and the CITED rows below: no timestamp, no commit id, no
@@ -25,6 +25,9 @@ Token families, all in tokens{}:
     MATURE_60Y_L5_AT_PRINTED, ..._GAS_PRINTED  the MATURE_60Y solves, points and printed gas price
     STEPDOWN_1_L5 to STEPDOWN_4_DCF           the step-down bars, with _DELTA, _GAS_S_GJ, _LABEL
     COFUND_L5_25Y_SHARE_PCT, COFUND_L5_25Y_SM co-funding at 25 y and 60 y, both methods
+    SUB_L5_BOAK_25Y_N1P00_A_PROG_S50_COST_NET   co-funding scenario: method, ledger key with the
+                                              subsidy dimension (eligible set, timing, share in
+                                              percent or BE for the break-even row), quantity
     VAL_N_PASS, VAL_<TEST>_SIM, ...           validation counts and rows
     LEVER_, EXCESS_, BUDGET_, NUCLEAR_ITEMS_  distance to the cost target, recomputed
     A_ATM_B_MT, Q_PROCESS_B_MWTH, ...         named aliases in ALIASES below
@@ -64,6 +67,12 @@ CSV_COLUMNS = {
                             "abatement_t_y", "dcf_value", "dcf_unit", "status"},
     "Sensitivity_Results.csv": {"sweep_id", "run_id", "parameter", "unit", "base_value",
                                 "test_value", "metric", "result", "delta", "status"},
+    "Subsidy_Scenarios.csv": {"run_id", "stage", "life_y", "n", "reactor_charged_mwth", "definition",
+                              "timing", "row_kind", "method", "share", "breakeven_case",
+                              "total_capital_sgdm", "eligible_capital_sgdm", "grant_sgdm",
+                              "private_capital_sgdm", "annual_cost_net_sgdm_y", "abatement_t_y",
+                              "cost_gross_s_per_t", "cost_net_s_per_t", "target_met",
+                              "public_outlay_s_per_t", "status"},
     "Validation_Results.csv": {"test_id", "level", "literature", "simulated", "unit", "rel_error",
                                "status", "data_use"},
 }
@@ -335,10 +344,23 @@ def add_aliases(tok, rows):
         raise BuildError("aliases with no value: " + "; ".join(lost))
 
 
+TIMING_TAG = {"PROGRESSIVE": "PROG", "AT_CLOSE": "CLOSE"}
+
+
+def subsidy_tag(r):
+    """Subsidy dimension of a ledger key: eligible set, timing and share in percent, or BE for a
+    break-even row. A table with no grant columns, such as the Economic ledger, has none, so a
+    grant row can never share a key with a plain row."""
+    if "definition" not in r:
+        return ""
+    share = "BE" if r["row_kind"] == "breakeven" else f"S{round(100 * num(r['share'])):02d}"
+    return f"_{r['definition']}_{TIMING_TAG[r['timing']]}_{share}"
+
+
 def ledger_key(r, rated):
     charged = num(r["reactor_charged_mwth"])
     need = "" if abs(charged - rated) <= RATED_TOL_MWTH else "_NEED"
-    return f"{r['stage']}_{r['life_y']}Y_{tag_n(num(r['n']))}{need}"
+    return f"{r['stage']}_{r['life_y']}Y_{tag_n(num(r['n']))}{need}{subsidy_tag(r)}"
 
 
 def add_ledger(tok, rows, rated, checks):
@@ -391,6 +413,53 @@ def add_ledger(tok, rows, rated, checks):
         raise BuildError(f"ledger cumulative columns disagree with the line values by {worst:.2e}")
     checks.append({"name": "ledger_cumulative_closure", "state": "ok",
                    "detail": f"largest residual {worst:.2e} over all ledger keys"})
+
+
+SUBSIDY_QUANTITIES = (
+    ("COST_NET", "cost_net_s_per_t", "S$/t"), ("COST_GROSS", "cost_gross_s_per_t", "S$/t"),
+    ("OUTLAY", "public_outlay_s_per_t", "S$/t"), ("ANNUAL_NET", "annual_cost_net_sgdm_y", "S$M/y"),
+    ("TOTAL_CAPITAL", "total_capital_sgdm", "S$M"), ("ELIGIBLE", "eligible_capital_sgdm", "S$M"),
+    ("GRANT", "grant_sgdm", "S$M"), ("PRIVATE", "private_capital_sgdm", "S$M"),
+)
+
+
+def add_subsidy(tok, rows, rated, checks):
+    """The co-funding table: one token per quantity of each row, the break-even share of each
+    scenario in fraction and in percent rounded up, and a check that a share of zero reproduces
+    the Economic ledger."""
+    src = "Subsidy_Scenarios.csv"
+    for r in rows:
+        key = ledger_key(r, rated)
+        stem = f"SUB_{r['method']}_{key}"
+        where = f"{src}:{r['run_id']}:{key}:{r['method']}"
+        status = r["status"]
+        for name, col, unit in SUBSIDY_QUANTITIES:
+            v = num(r[col])
+            if v is not None:
+                tok.add(f"{stem}_{name}", v, unit, f"{where}:{col}", status)
+        tok.add(f"{stem}_MET", 1.0 if r["target_met"] == "true" else 0.0, "-", f"{where}:target_met", status,
+                places=(0, 0))
+        if r["row_kind"] == "breakeven":
+            share = num(r["share"])
+            tok.add(f"{stem}_SHARE", share, "-", f"{where}:share", status, places=(6, 6))
+            # Rounded up at two decimals, so a printed percentage never sits below the infimum.
+            tok.add(f"{stem}_SHARE_PCT", math.ceil(round(share * 1e4, 6)) / 100, "%", f"{where}:share", status,
+                    derived=True, places=(2, 2))
+    worst, n = 0.0, 0
+    for stage in ("FOAK", "BOAK", "10OAK_P46", "10OAK_P47"):
+        for life in (25, 60):
+            for method, ref in (("L5", f"AC_L5_{stage}_{life}Y"), ("DCF", f"LAC_DCF_{stage}_{life}Y")):
+                want = tok.value(ref)
+                for d in ("A", "B"):
+                    for t in ("PROG", "CLOSE"):
+                        for q in ("COST_GROSS", "COST_NET"):
+                            got = tok.value(f"SUB_{method}_{stage}_{life}Y_N1P00_{d}_{t}_S00_{q}")
+                            worst = max(worst, abs(got - want))
+                            n += 1
+    if worst > 1e-5:
+        raise BuildError(f"a share of zero in {src} differs from the Economic ledger by {worst:.2e} S$/t")
+    checks.append({"name": "subsidy_zero_share_equals_economic_ledger", "state": "ok",
+                   "detail": f"{n} zero-share costs agree with AC_L5 and LAC_DCF, largest difference {worst:.2e} S$/t"})
 
 
 def add_rows(tok, rows, prefix, keyfn, fields, file):
@@ -876,7 +945,7 @@ def run_checks(tok, tables, checks):
     for name, rows in tables.items():
         statuses.update(r.get("status", "") for r in rows if name != "Validation_Results.csv")
     for s, c in sorted(statuses.items()):
-        tok.add(f"STATUS_ROWS_{s.upper()}", float(c), "rows", "status column of the six results tables", derived=True)
+        tok.add(f"STATUS_ROWS_{s.upper()}", float(c), "rows", "status column of the results tables other than validation", derived=True)
     return dict(sorted(statuses.items()))
 
 
@@ -888,6 +957,7 @@ def build():
     add_aliases(tok, basis)
     rated = tok.value("REACTOR_RATED_MWTH")
     add_ledger(tok, tables["Economic_Ledger.csv"], rated, checks)
+    add_subsidy(tok, tables["Subsidy_Scenarios.csv"], rated, checks)
     add_rows(tok, tables["Integrated_Energy_Balance.csv"], "EB", lambda r: f"{r['run_id']}_{r['term_id']}",
              energy_fields, "Integrated_Energy_Balance.csv")
     add_rows(tok, tables["Integrated_Mass_Balance.csv"], "MB", lambda r: f"{r['run_id']}_{r['stream_id']}",

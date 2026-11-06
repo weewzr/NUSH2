@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Assemble the static site in _site/ from frontend/, the wasm module and the
-seven results CSVs. Python stdlib only.
+eight results CSVs. Python stdlib only.
 
 Steps:
  1. Delete and recreate the output folder.
@@ -50,6 +50,7 @@ RESULTS = (
     "Integrated_Energy_Balance.csv",
     "Integrated_Mass_Balance.csv",
     "Sensitivity_Results.csv",
+    "Subsidy_Scenarios.csv",
     "Validation_Results.csv",
 )
 NOTICES = "THIRD_PARTY_NOTICES.txt"

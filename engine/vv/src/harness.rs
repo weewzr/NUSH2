@@ -315,7 +315,7 @@ pub fn plant_rows() -> Result<Vec<Row>> {
             6,
             "Two exports in one process match",
             "tables differing",
-            "Six plant tables",
+            "Seven plant tables",
         ),
         0.0,
         if first == second { 0.0 } else { 1.0 },

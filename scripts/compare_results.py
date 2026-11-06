@@ -27,6 +27,7 @@ EXPECTED = (
     "Integrated_Energy_Balance.csv",
     "Integrated_Mass_Balance.csv",
     "Sensitivity_Results.csv",
+    "Subsidy_Scenarios.csv",
     "Validation_Results.csv",
 )
 NUM = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$")

@@ -35,6 +35,9 @@ use crate::gates::Gates;
 use crate::heatrec::{self, SourceId};
 use crate::params::{ParamEntry, ParamSet};
 use crate::sens::{sweeps, FsInputs, FsPoint, SensRow};
+use crate::subsidy::{
+    round_up_share, BreakEven, Definition, GrantQuery, MethodEval, SubsidyEval, Timing,
+};
 use crate::terms::{Source, Term};
 use nush2_numerics::{EngineError, Result};
 use nush2_props::equilibrium::KSource;
@@ -306,7 +309,7 @@ pub const RUNS: [RunDef; 6] = [
     },
 ];
 
-/// The six tables the plant crate can build. Validation lives in `nush2_vv`.
+/// The seven tables the plant crate can build. Validation lives in `nush2_vv`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tables {
     pub final_design_basis: String,
@@ -315,6 +318,7 @@ pub struct Tables {
     pub emissions_ledger: String,
     pub economic_ledger: String,
     pub sensitivity_results: String,
+    pub subsidy_scenarios: String,
 }
 
 /// CSV text builder with `\n` line ends.
@@ -452,6 +456,7 @@ pub fn tables_with(p: &ParamSet, gates: &Gates) -> Result<Tables> {
             &sensitivity(p, &fsx, &cryo)?,
             hw,
         )?,
+        subsidy_scenarios: mark(subsidy_scenarios(&mh)?, &subsidy_scenarios(&m0)?, hw)?,
     })
 }
 
@@ -3344,6 +3349,248 @@ fn economic_ledger(m: &Model) -> Result<String> {
                 t(unit),
                 t(STATUS),
             ]);
+        }
+    }
+    Ok(c.out)
+}
+
+/// Columns of `Subsidy_Scenarios.csv`.
+const SUBSIDY_HEADER: [&str; 35] = [
+    "run_id",
+    "stage",
+    "life_y",
+    "n",
+    "reactor_charged_mwth",
+    "definition",
+    "timing",
+    "default_case",
+    "row_kind",
+    "method",
+    "share",
+    "breakeven_case",
+    "total_capital_sgdm",
+    "eligible_capital_sgdm",
+    "grant_sgdm",
+    "private_capital_sgdm",
+    "interest_gross_sgdm",
+    "interest_private_sgdm",
+    "interest_saved_sgdm",
+    "annual_cost_gross_sgdm_y",
+    "annual_cost_net_sgdm_y",
+    "abatement_t_y",
+    "cost_gross_s_per_t",
+    "cost_net_s_per_t",
+    "target_s_per_t",
+    "target_met",
+    "public_outlay_s_per_t",
+    "state_pv_sgdm",
+    "gap_to_l5_s_per_t",
+    "gap_share_of_l5",
+    "class",
+    "source",
+    "source_status",
+    "equation",
+    "status",
+];
+
+/// Source text of the co-funding rows.
+const SUBSIDY_SOURCE: &str = "Co-funding model, equations S.1 to S.9c of the cost and subsidy \
+     derivation; cost items as in Economic_Ledger.csv";
+
+/// Decimals printed for a share. A break-even share is rounded up in the last one,
+/// so the printed share lies on the passing side of the infimum (equation S.7e).
+const SHARE_DECIMALS: i32 = 6;
+
+/// One row of the co-funding table: a method at one grant, or a break-even share.
+struct SubsidyRow<'a> {
+    stage: Stage,
+    life: f64,
+    n: f64,
+    charged: f64,
+    default_case: bool,
+    kind: &'static str,
+    method: &'static str,
+    case: &'static str,
+    equation: &'static str,
+    eval: &'a SubsidyEval,
+    /// The method's quantities; `None` on a row for both methods together.
+    cells: Option<&'a MethodEval>,
+}
+
+fn subsidy_row(c: &mut Csv, r: &SubsidyRow<'_>) {
+    let p = &r.eval.plan;
+    let by = |f: &dyn Fn(&MethodEval) -> f64| r.cells.map(f).map(num).unwrap_or_default();
+    let met = r.cells.map_or(r.eval.target_met, |x| x.target_met);
+    let dcf_row = r.method == "DCF";
+    c.row(&[
+        t("B_REC_F"),
+        t(r.stage.id()),
+        format!("{:.0}", r.life),
+        format!("{:.4}", r.n),
+        format!("{:.2}", r.charged),
+        t(p.definition.id()),
+        t(p.timing.id()),
+        r.default_case.to_string(),
+        t(r.kind),
+        t(r.method),
+        num(p.share),
+        t(r.case),
+        num(p.total_capital),
+        num(p.eligible),
+        num(p.grant),
+        num(p.private_capital),
+        by(&|x| x.interest_gross_sm),
+        by(&|x| x.interest_private_sm),
+        by(&|x| x.interest_saved_sm),
+        by(&|x| x.cost_gross_sm_y),
+        by(&|x| x.cost_net_sm_y),
+        num(r.eval.abatement_t_y),
+        by(&|x| x.lac_gross),
+        by(&|x| x.lac_net),
+        num(r.eval.target),
+        met.to_string(),
+        by(&|x| x.public_outlay_s_per_t),
+        by(&|x| x.state_pv_sm),
+        if dcf_row {
+            num(r.eval.gap_s_per_t)
+        } else {
+            String::new()
+        },
+        if dcf_row {
+            num(r.eval.gap_rel)
+        } else {
+            String::new()
+        },
+        t("calculated"),
+        t(SUBSIDY_SOURCE),
+        t("primary"),
+        t(r.equation),
+        t(STATUS),
+    ]);
+}
+
+/// One point of the co-funding table: a stage and life, an eligible set and a
+/// timing, with the abatement that both methods divide by.
+struct SubsidyPoint<'a> {
+    m: &'a Model,
+    b: &'a Balance,
+    q: CostQuery,
+    definition: Definition,
+    timing: Timing,
+    a: f64,
+}
+
+impl SubsidyPoint<'_> {
+    fn eval(&self, share: f64) -> Result<SubsidyEval> {
+        let g = GrantQuery {
+            share,
+            definition: self.definition,
+            timing: self.timing,
+        };
+        self.m.subsidy_eval(self.b, &self.q, g, self.a)
+    }
+
+    /// The share to print for a break-even result and the evaluation at it. A
+    /// share is rounded up in its last printed digit, and moved up one digit at a
+    /// time if the strict test still fails at the rounded share.
+    fn printed_breakeven(
+        &self,
+        result: BreakEven,
+        passes: &dyn Fn(&SubsidyEval) -> bool,
+    ) -> Result<(&'static str, SubsidyEval)> {
+        let max = self.m.subsidy.share_max;
+        let (mut share, case) = match result {
+            BreakEven::MetWithoutGrant => (0.0, "met_without_grant"),
+            BreakEven::Share(s) => (round_up_share(s, SHARE_DECIMALS).min(max), "share"),
+            BreakEven::Unreachable { .. } => (max, "unreachable"),
+        };
+        let mut e = self.eval(share)?;
+        if case == "share" {
+            let step = 10f64.powi(-SHARE_DECIMALS);
+            for _ in 0..8 {
+                if passes(&e) || share >= max {
+                    break;
+                }
+                share = (share + step).min(max);
+                e = self.eval(share)?;
+            }
+        }
+        Ok((case, e))
+    }
+}
+
+/// The co-funding table of the headline run: every stage, a life of 25 and of
+/// 60 y, both eligible sets and both timings, at the share grid and at the
+/// break-even share, for the ledger (L5) and the discounted cash flow. The
+/// annual net abatement is the one the Economic ledger divides by.
+///
+/// eq: S.6a
+/// eq: S.6b
+/// eq: S.7e
+/// eq: S.8
+fn subsidy_scenarios(m: &Model) -> Result<String> {
+    let mut c = Csv::new(&SUBSIDY_HEADER);
+    let run = run_def("B_REC_F")?;
+    let b = balance_for(m, &run)?;
+    let a = m.emissions(&b.c, b.s).a_atm;
+    let charged = crate::charged(m, run.case, &b);
+    let sp = &m.subsidy;
+    for stage in Stage::ALL {
+        for life in [m.lives[0], m.lives[2]] {
+            let q = CostQuery::central(stage, life, m.n_linear, charged);
+            for definition in Definition::ALL {
+                for timing in Timing::ALL {
+                    let s = SubsidyPoint {
+                        m,
+                        b: &b,
+                        q,
+                        definition,
+                        timing,
+                        a,
+                    };
+                    let default_case =
+                        definition == sp.default_definition && timing == sp.default_timing;
+                    let row = |kind: &'static str,
+                               method: &'static str,
+                               case: &'static str,
+                               equation: &'static str,
+                               eval: &SubsidyEval,
+                               cells: Option<&MethodEval>,
+                               c: &mut Csv| {
+                        subsidy_row(
+                            c,
+                            &SubsidyRow {
+                                stage,
+                                life,
+                                n: m.n_linear,
+                                charged,
+                                default_case,
+                                kind,
+                                method,
+                                case,
+                                equation,
+                                eval,
+                                cells,
+                            },
+                        );
+                    };
+                    for share in sp.grid {
+                        let e = s.eval(share)?;
+                        row("grid", "L5", "", "S.6a", &e, Some(&e.l5), &mut c);
+                        row("grid", "DCF", "", "S.6b", &e, Some(&e.dcf), &mut c);
+                    }
+                    let be = m.breakeven(&b, &q, definition, timing, a)?;
+                    let at_close = timing == Timing::AtClose;
+                    let (case, e) = s.printed_breakeven(be.l5.result, &|e| e.l5.target_met)?;
+                    let eq5 = if at_close { "S.7c" } else { "S.7b" };
+                    row("breakeven", "L5", case, eq5, &e, Some(&e.l5), &mut c);
+                    let (case, e) = s.printed_breakeven(be.dcf.result, &|e| e.dcf.target_met)?;
+                    let eqd = if at_close { "S.7d" } else { "S.7b" };
+                    row("breakeven", "DCF", case, eqd, &e, Some(&e.dcf), &mut c);
+                    let (case, e) = s.printed_breakeven(be.both, &|e| e.target_met)?;
+                    row("breakeven", "BOTH", case, "S.7e", &e, None, &mut c);
+                }
+            }
         }
     }
     Ok(c.out)
