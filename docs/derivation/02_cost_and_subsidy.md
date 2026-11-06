@@ -558,7 +558,7 @@ Validation test: `eq_s_3d_idle_cash_earning_the_rate_gives_the_lowest_break_even
 
 ### Equation S.4a: progressive grant, DCF (analytical)
 
-**What it calculates.** The private payments and funded balance when the grant pays a share of each bill on its payment date.
+**What it calculates.** The private payments and funded balance when the grant pays a share of each bill as it falls due.
 
 **Variables.** $s$, $e_j$ [$1$]; $b_k$, $p_k$, $g_k$ [$\mathrm{S\$M}$]; $K_j$ [$\mathrm{S\$M}$] for the items bought at year 0.
 
