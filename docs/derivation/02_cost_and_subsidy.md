@@ -188,9 +188,9 @@ $$f_D=\frac{1}{t_c}\left[\,q\,(1+i)^{w}+\frac{(1+i)^{w}-1}{i}\right],\qquad \mat
 
 **Feeds into.** S.0.2 (compare with $f_{IDC}$), S.0.5 (reactor term of $\Delta\mathrm{NPV}$), S.3a and S.4a (the private share of this PV).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::subsidy::bucket_factor` (the closed form); the dated buckets are `nush2_plant::dcf::uniform_spend`, used by `Model::dcf_at`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_1_dcf_bucket_factor_equals_the_dated_buckets` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.0.2: the 0.0026 gap between the two interest factors (analytical, with a series check)
 
@@ -218,9 +218,9 @@ $$\Delta f=\frac{(1+i)^{w}\,\big[1+qi-(1+i)^{q}\big]}{i\,t_c}\ \ge 0 .$$
 
 **Feeds into.** S.0.6 (total gap) and S.6b. Under a progressive grant this term scales by $(1-s)$ (S.9c).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: none beyond S.0.1: the engine holds the two factors, `subsidy::bucket_factor` and `Model::idc_factor`, and the gap is their difference; the closed form is the check
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_2_the_two_interest_factors_differ_by_the_closed_form_gap` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.0.3: replacement factor and the replaced-item gap (analytical)
 
@@ -245,9 +245,9 @@ $$\rho_R(t_\ell)=\sum_{m=0}^{n-1}v^{mt_u}-\frac{nt_u-t_\ell}{t_u}\,v^{t_\ell},\q
 
 **Feeds into.** S.0.5 (the DCF closed form) and S.0.6. Also S.1: only the first unit of an item can be granted.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::dcf::with_replacement` (existing, private), called by `Model::dcf_at` for the capture plant, the IHX and the recycle train
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_3_replacement_factor_gives_the_replaced_item_gap` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.0.4: decommissioning identity (analytical)
 
@@ -263,9 +263,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** S.0.6: the decommissioning gap term is zero. This holds at the central cost level; at the High level the ledger uses a different fund rate (audit finding), which is out of scope here.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::ledger` (line DECOM, sinking fund) and `Model::dcf_at` (line DECOM, one payment at the horizon)
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_4_decommissioning_sinking_fund_equals_the_discounted_payment` in `engine/plant/tests/m10_subsidy.rs`; the existing `eq_l_03_decommissioning_at_end_of_life_equals_the_sinking_fund` in `engine/plant/src/dcf.rs`
 
 ### Equation S.0.5: the two costs per tonne in closed form (analytical)
 
@@ -291,9 +291,9 @@ $$\mathrm{LAC}_5=\frac{10^{6}\,\Delta C_5}{\mathcal{A}},\qquad
 
 **Feeds into.** S.0.6 and every later equation: a grant changes only the capital terms in the braces.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::ledger` with `Ledger::l5` for the ledger, and `Model::dcf_at` (fields `lac` and `l5`) for the discounted cash flow
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_5_closed_forms_reproduce_both_costs_per_tonne` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.0.6: total gap between the methods at zero subsidy (analytical)
 
@@ -312,9 +312,9 @@ $$\mathrm{LAC}_D-\mathrm{LAC}_5=\frac{10^{6}}{\mathcal{A}}\Big\{\mathrm{CRF}(t_\
 
 **Feeds into.** S.9c: the grant effect on the gap is predicted in closed form.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::dcf_at` (fields `gap_abs`, `gap_rel` and `gap_terms`)
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_0_6_the_gap_between_the_methods_at_zero_subsidy_is_predicted` in `engine/plant/tests/m10_subsidy.rs`
 
 ## 1.5 Verification against the committed ledger
 
@@ -406,9 +406,9 @@ $$E=\sum_{j}e_j\,K_j,\qquad E_A=C_R,\qquad E_B=C_R+K_{ihx}+K_{lic}+K_{pi}.$$
 
 **Feeds into.** S.2 (substitute $E$ into $G=sE$).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::grant_plan` (fields `eligible` and `other_eligible`) with `subsidy::SubsidyParams::eligibility`; the flags are the `SUBSIDY_ELIG_` entries of `engine/data/parameters.toml`. Definition B in the registry follows decision D7b (reactor, IHX, capture plant, recycle train and licence). The table above and the worked numbers of S.6a, S.7d and S.8 use another membership (reactor, IHX, licence and power island), which the tests reproduce by setting those flags
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_1_eligible_capital_is_the_flagged_sum_and_b_contains_a` and `eq_s_1_worked_numbers_of_the_derivation_follow_from_its_membership` in `engine/plant/tests/m10_subsidy.rs`; `subsidy::tests::eq_s_1_registry_membership_follows_decision_d7b` and `subsidy::tests::eq_s_1_a_flag_that_is_not_zero_or_one_is_refused` in `engine/plant/src/subsidy.rs`
 
 ### Equation S.2: grant and private capital (analytical)
 
@@ -432,9 +432,9 @@ $$G=sE,\qquad K^{priv}=K_{tot}-G .$$
 
 **Feeds into.** S.3a, S.4a (how $G$ is applied), S.8 (reporting).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::grant_plan` (fields `grant`, `total_capital` and `private_capital`); a share outside 0 to 1 is refused
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_2_private_capital_never_rises_with_the_share_and_the_grant_stays_within_eligible` and `eq_s_2_the_subsidy_changes_no_physical_flow_and_no_operating_cost` in `engine/plant/tests/m10_subsidy.rs`; `subsidy::tests::eq_s_2_the_grid_defaults_and_limits_are_read_and_checked` in `engine/plant/src/subsidy.rs`
 
 ### Equation S.3a: grant at financial close, DCF buckets and funded balance (numerical)
 
@@ -472,9 +472,9 @@ Interest during construction in the DCF (balance at year 0 minus cash paid in): 
 
 **Feeds into.** S.3b (a closed form for $P_D$), S.6b (substitute $P_D(G)$ for the reactor term $C_Rf_D$).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::subsidy::funded_balance`, called by `Model::grant_plan` for a grant at close
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_3a_a_grant_at_close_pays_the_earliest_buckets_and_leaves_the_owner_the_rest` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.3b: closed form of $P_D(G)$ (analytical, piecewise)
 
@@ -498,9 +498,9 @@ $$P_D(G)=\frac{C_R}{t_c}\left[\varrho\,(1+i)^{n_r}+\frac{(1+i)^{n_r}-1}{i}\right
 
 **Feeds into.** S.6b and S.7d.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::subsidy::private_pv_closed_form`, used by the break-even solve at close
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_3b_the_closed_form_equals_the_balance_recursion` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.3c: grant at close, ledger form (analytical)
 
@@ -528,9 +528,9 @@ $$\text{private reactor value}=C_R\,h(u),\qquad h(u)=\frac{(1+i)^{t_c(1-u)}-1}{i
 
 **Feeds into.** S.6a (substitute $C_Rh(u)$ for $C_Rf_{IDC}$ in the reactor term) and S.7c.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::subsidy::private_factor_at_close`, called by `Model::grant_plan` for a grant at close. The smooth form is kept: the ledger interest can dip below zero by at most 0.18 percent of the reactor capital when the private window is shorter than one year
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_3c_the_ledger_form_at_close_and_its_limits` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.3d: upper bound with idle cash earning the discount rate (analytical, not the default)
 
@@ -552,9 +552,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** S.9b (the reason for convention 3).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::idle_cash_bound_share` (a bound that the model does not use); `SUBSIDY_GRANT_CASH_RATE` must be 0 and `subsidy::SubsidyParams::read` refuses any other value
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_3d_idle_cash_earning_the_rate_gives_the_lowest_break_even_share` in `engine/plant/tests/m10_subsidy.rs`; `subsidy::tests::eq_s_3d_and_s_5a_only_the_implemented_conventions_are_accepted` in `engine/plant/src/subsidy.rs`
 
 ### Equation S.4a: progressive grant, DCF (analytical)
 
@@ -578,9 +578,9 @@ $$p_k=(1-s)\,b_k,\qquad P_D^{prog}=(1-s)\,C_R\,f_D,\qquad \mathrm{PV}(\text{GRAN
 
 **Feeds into.** S.6b.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::grant_plan`, progressive branch (fields `dcf_flows` and `dcf_private_reactor_pv`); `Model::dcf_at` adds the GRANT line
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_4a_a_progressive_grant_scales_every_private_payment` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.4b: progressive grant, ledger form (analytical)
 
@@ -598,9 +598,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** S.6a.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::grant_plan`, progressive branch (ledger fields); `Model::ledger` sets `Ledger::net`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_4b_a_progressive_grant_scales_the_ledger_reactor_value` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.5a: the interest bases (analytical)
 
@@ -627,9 +627,9 @@ $$\mathrm{IDC}^{(2)}=\text{private balance at year 0}-\text{private cash paid in
 
 **Feeds into.** S.5b and S.6.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::grant_plan` (fields `ledger_interest_gross`, `ledger_interest_private`, `ledger_interest_saved` and the `dcf_interest_` fields)
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_5a_interest_is_charged_on_the_private_balance_and_the_saving_is_reported` in `engine/plant/tests/m10_subsidy.rs`; `subsidy::tests::eq_s_3d_and_s_5a_only_the_implemented_conventions_are_accepted` in `engine/plant/src/subsidy.rs`
 
 ### Equation S.5b: no double count and the size of the wrong ways (analytical)
 
@@ -654,9 +654,9 @@ $$\Delta C_5(s)=\Delta C_5(0)-\mathrm{CRF}(t_\ell)\,\big[G+\mathrm{IDC}^{(3)}\bi
 
 **Feeds into.** S.6a, S.8.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_plant::economics::NetBlock` and `Ledger::l5_net`, set in `Model::ledger`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_5b_the_net_cost_is_the_gross_cost_less_the_grant_and_the_interest_it_saves` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.6a: ledger cost as a function of the share (analytical)
 
@@ -688,9 +688,9 @@ Net-of-grant block for the ledger (L0 to L5 stay gross): $\text{GRANT\_CREDIT}=-
 
 **Feeds into.** S.7 (break-even) and S.8.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::subsidy_eval_at` (field `l5` of `SubsidyEval`), which takes the net ledger from `Model::ledger`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_6a_ledger_cost_follows_the_closed_form_for_each_timing` and `eq_s_6a_derivation_tables_for_definition_b_follow_from_its_membership` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.6b: DCF cost as a function of the share (analytical when progressive, numerical at close)
 
@@ -715,9 +715,9 @@ $$\mathrm{LAC}_D(s)=\mathrm{LAC}_D(0)-\kappa\times\begin{cases}s\,(C_R f_D+X_E)&
 
 **Feeds into.** S.7, S.8.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::subsidy_eval_at` (field `dcf` of `SubsidyEval`), which takes the net cash flow from `Model::dcf_at`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_6b_dcf_cost_follows_the_closed_form_for_each_timing` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.7a: when the cost is affine in the share (analytical)
 
@@ -745,9 +745,9 @@ $$\mathrm{LAC}_k(s)=\mathrm{LAC}_k(0)-s\,M_k,\qquad M_5=\kappa\,(C_Rf_{IDC}+X_E)
 
 **Feeds into.** S.7b.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: the slopes are the denominators of the private closed forms `Curve::ledger` and `Curve::dcf` in `engine/plant/src/subsidy.rs`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_7a_progressive_cost_is_affine_and_the_cost_at_close_bends` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.7b: break-even share for a progressive grant (analytical)
 
@@ -772,9 +772,9 @@ $$s^{*}_5=\frac{\Delta C_5(0)-T\,\mathcal{A}\times10^{-6}}{\mathrm{CRF}(t_\ell)\
 
 **Feeds into.** S.7e.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Curve::ledger` and `Curve::dcf` (progressive branch), called by `Model::breakeven_at`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_7b_break_even_for_a_progressive_grant` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.7c: break-even share at close, ledger form (analytical)
 
@@ -799,9 +799,9 @@ $$u^{*}=1-\frac{\ln\!\big(1+i\,t_c\,H^{*}\big)}{t_c\ln(1+i)},\quad H^{*}=f-\frac
 
 **Feeds into.** S.7e.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Curve::ledger`, at-close branch, called by `Model::breakeven_at`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_7c_break_even_at_close_in_both_regimes_of_the_ledger` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.7d: break-even share at close, DCF, and the numerical fallback (numerical)
 
@@ -837,9 +837,9 @@ In every row the progressive share exceeds the at-close share, which exceeds the
 
 **Feeds into.** S.7e.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Curve::dcf`, at-close branch (exact piecewise-linear route with `Curve::dcf_close`), `subsidy::bisect_share` and the residual check of `Model::solve_share`; all called by `Model::breakeven_at`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_7d_the_exact_route_and_the_bisection_agree_and_the_orderings_hold` in `engine/plant/tests/m10_subsidy.rs`; `subsidy::tests::eq_s_7d_a_closed_form_that_fails_the_residual_check_falls_back_to_bisection` in `engine/plant/src/subsidy.rs`
 
 ### Equation S.7e: cases of $s^{*}$ and the target flag (analytical)
 
@@ -867,9 +867,9 @@ The comparison uses the unrounded values. Present $s^{*}$ rounded up in the last
 
 **Feeds into.** S.8.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `subsidy::BreakEven`, `subsidy::combine`, `subsidy::round_up_share` and the strict flag `MethodEval::target_met`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_7e_cases_of_the_break_even_share_and_the_strict_target_flag` and `eq_s_7e_a_break_even_set_is_a_pure_function_of_its_inputs` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.8: reported quantities (analytical)
 
@@ -910,9 +910,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** The CSV table of Phase 5 and the interface of Phase 6.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::subsidy_eval_at` (types `SubsidyEval`, `MethodEval` and `GrantPlan`) and the exporter function `export::subsidy_scenarios`, which writes `results/Subsidy_Scenarios.csv`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_8_reported_quantities_are_consistent`, `eq_s_8_a_grant_leaves_the_rx_mult_lever_alone`, `eq_s_8_the_committed_table_matches_the_engine` and `eq_s_8_the_committed_table_reproduces_the_economic_ledger_at_a_zero_share` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.9a: monotonicity and convexity (analytical)
 
@@ -935,9 +935,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** S.7d, S.9b.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: no separate function: the shape follows from the forms of S.6a and S.6b
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_9a_the_cost_falls_strictly_with_the_share_and_bends_one_way` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.9b: limiting cases (analytical)
 
@@ -961,9 +961,9 @@ Validation test: to be filled in Phase 3
 
 **Feeds into.** The Phase 4 limit tests.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: the zero-share skip in `Model::ledger` and `Model::dcf_at` (a share of zero leaves `Ledger::net` as `None` and adds no GRANT line)
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_9b_a_zero_share_changes_nothing_bit_for_bit`, `eq_s_9b_zero_subsidy_reproduces_the_committed_ledger_and_dcf` and `eq_s_9b_limiting_cases_at_zero_and_full_share` in `engine/plant/tests/m10_subsidy.rs`
 
 ### Equation S.9c: independent closed-form check of the grant effect (analytical, with three further routes)
 
@@ -988,9 +988,9 @@ $$\mathrm{LAC}_5(0.5)=189.7495-0.5\times144.16543=117.6668,\qquad \mathrm{LAC}_5
 
 **Feeds into.** The Phase 4 validation design.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `SubsidyEval` fields `gap_s_per_t` and `gap_rel` with `SubsidyEval::gap_within`, and the GRANT term in `DcfResult::gap_terms`
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_s_9c_the_grant_effect_by_four_routes_that_share_no_code_with_the_engine`, `eq_s_9c_the_gap_between_the_methods_equals_the_prediction_and_stays_below_the_limit` and `eq_s_9c_gap_terms_still_sum_to_the_gap_with_a_grant` in `engine/plant/tests/m10_subsidy.rs`
 
 ---
 
