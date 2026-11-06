@@ -72,13 +72,37 @@ Files modified: `docs/derivation/` (2 new), `math/verify/` (2 new), `docs/ABATEM
 
 Tests run: both SymPy scripts, and `scripts/check_clean.py` over the repository (0 hits).
 
+## Phase 3: backend implementation, independent carbon basis
+
+This entry covers the carbon track. The co-funding model is recorded by its own commits. The branch head at the start of this work was 9471f9f, which already held the co-funding model, so the legacy snapshot comparison skips the rows and the table that track added.
+
+Completed:
+
+- The plant's own stream ledger now drives the default. `engine/plant/src/abatement.rs` runs the Level 3 flowsheet on the hydrogen target, with the cryogenic carbon recovery f and hydrogen return r read from the registry as flagged design inputs (decision D8), and reads captured CO2, stack, condensate CO2, product methane and the gas rate from it. Closure carries the unmodelled streams U1, U2, U4b and U6 as unknown, never zero, so the whole-account verdict is undetermined and the verdict on the modelled streams is closed at a relative residual of 4.3e-12 against the tolerance of 1e-9.
+- The central unabated reference is the IEAGHG 2017-02 Case 1 intensity times the annual hydrogen (decision D2). INL, Cho and a plant-built floor (the same flowsheet without capture, recycle or firing gas) are comparison rows.
+- Transport and storage emissions come from physical inputs (decision D7c): a 1000 km ship at 6.77 g fuel per t per km, conditioning and injection electricity at the 2020 grid factor, terminal operations and purge. The sum is 0.03242 t per t against the flat 0.025, which stays as a cross-check row. The shipping distance is a labelled assumption with a band of 200 to 2000 km.
+- The legacy basis is selectable and bit-identical: `CARBON_BASIS` in the registry, `--basis legacy|independent` on the command line (default independent) and a carbon basis control in the wasm reply. A snapshot of the seven tables at main 8750b09 sits in `engine/vv/data/legacy_results/`, `scripts/compare_results.py` gained `--subset`, `--names` and `--allow-cell`, and both workflows export with `--basis legacy` and compare with the snapshot.
+- Tests: `engine/plant/tests/m11_carbon.rs` checks every equation N.1.1 to N.10.4 by id plus closure, non-negative streams, one hydrogen output for plant and reference, boundaries and the legacy equality. The existing tests that encode copied values keep passing on the legacy functions. Where a test compared the exporter with the committed tables or cost sweeps it now uses the plant basis, and the closed forms of the co-funding tests keep their literal anchors on the legacy basis.
+
+Outstanding from this track:
+
+- N.7.2 is a function and a test, and the central result does not call it: the furnace efficiency and the steam duty of the reference have no source, so every figure against the plant-built reference is a floor.
+- N.9.5 is carried as the CO2 view. No value of a warming potential exists in the repository, so the CO2e term stays at its zero default.
+- The heat and power balance keeps the anchored captured CO2 (359,777 t per year), while abatement, the transport and storage tonnage and the capture capital use the plant's 363,277 t per year, 0.97 percent more. A validation row prints the reboiler duty that the plant's own capture would imply.
+- The GAS line of the cost ledger keeps INL's 52.5 MMSCFD reference gas. The central intensity implies 35.09 MMSCFD at Case B against 35.87 for INL scaled, and a validation row prints the gap.
+- The site scripts (`build_numbers.py`, `build_site.py`, `check_site.py`) and the frontend labels still describe the INL headline. They belong to Phases 5 and 6.
+
+Tests run on the final tree of this track: `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` passed, `cargo test --workspace` passed 462 tests with none failed, the default export agrees with `results/` in all eight tables, and the export with `--basis legacy` agrees with the snapshot of main 8750b09 in the seven tables it holds (650 validation rows, of which 325 pass, 32 fail, 251 are reported and 42 are not run, as at the baseline). The default export has 668 validation rows: 331 pass, 32 fail, 263 reported and 42 not run.
+
+Failures: none new. The 32 failed literature benchmarks stay failed. Two of the new validation rows are reported comparisons with the copied INL values (net abatement 557,767 t per year against 578,052, and the 578,000 band of the drift check) and carry no limit.
+
 ## Phase status
 
 | Phase | Status |
 |---|---|
 | 1 Audit | complete |
 | 2 Independent derivation | complete |
-| 3 Backend implementation | not started |
+| 3 Backend implementation | carbon track and co-funding track committed; site scripts and frontend labels wait for Phases 5 and 6 |
 | 4 Validation | not started |
 | 5 Results export | not started |
 | 6 Frontend | not started |

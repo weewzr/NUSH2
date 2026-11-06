@@ -1,6 +1,6 @@
 # Independent CO2 accounting for the NUS-H2 plant: equations N.1 to N.10
 
-Branch `feature/independent-abatement-subsidy`, Phase 2 (independent derivation), derivation file 01. This file rebuilds the CO2 accounting of the MEA-capture plant from its own atom balances and stream flows. The published INL and IEAGHG values stay in the engine as the legacy basis and as validation references. The verification script is `math/verify/sympy_carbon.py`. Nothing here is implemented in Rust yet: every equation carries a line that Phase 3 fills in.
+Branch `feature/independent-abatement-subsidy`, Phase 2 (independent derivation), derivation file 01. This file rebuilds the CO2 accounting of the MEA-capture plant from its own atom balances and stream flows. The published INL and IEAGHG values stay in the engine as the legacy basis and as validation references. The verification script is `math/verify/sympy_carbon.py`. Phase 3 implemented every equation in Rust. Each equation ends with the function that carries it and the test that checks it by id.
 
 How to read this file. You need algebra and the idea that a flow is an amount per time. Every symbol is defined in the Reference Frame before it is used. Each equation is derived from atom balances in small steps, then the next equation is built from it. Numbers are quoted to the precision printed by the script, and every number comes from a file in `results/`, from `engine/data/parameters.toml` or from a constant in `engine/`. A quantity that none of those files supplies is shown as a symbol and listed as an open input.
 
@@ -258,9 +258,9 @@ $$\bar c=\sum_jy_ja_{C,j}=1.05379\ \mathrm{kmol\ C\ kmol^{-1}},\qquad F_C=\bar c
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::gas_constants` and `flowsheet::ng_carbon_per_mol` in `engine/plant/src/abatement.rs` and `engine/plant/src/flowsheet.rs`; the fresh carbon is the `feed` line of `carbon::CarbonLedger`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_1_1_carbon_per_kmol_and_feed_carbon` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.1.2: hydrogen potential and its conservation
 
@@ -286,9 +286,9 @@ $$Z_j=2a_{C,j}-a_{O,j}+\tfrac12a_{H,j},\qquad Z_{NG}=\sum_jy_jZ_j=4.13939$$
 
 Result type: analytical. The script also proves the conservation for D.1, D.2, D.3, the general reaction D.4 for any $\mathrm{C}_n\mathrm{H}_m$ and three combustion reactions.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::hydrogen_potential` in `engine/plant/src/abatement.rs`, evaluated on any species vector through the element counts of `nush2_props::mixture::elements`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_1_2_hydrogen_potential_table_and_conservation` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.1.3: hydrogen at the absorber
 
@@ -309,9 +309,9 @@ $$\dot n_{H_2,12}=\dot Z_{in}-4\dot n_{CH_4,09}-\dot n_{CO,09},\qquad \dot Z_{in
 
 Result type: analytical, exact for any converged flowsheet; it uses the numerical outputs $\dot n_{CH_4,09}$ and $\dot n_{CO,09}$ of D.11 and E.4.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::hydrogen_potential` in `engine/plant/src/abatement.rs` on S01, S03 and S09; the flowsheet itself solves the reformer and shift beds (`flowsheet::pass`).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_1_3_hydrogen_at_the_absorber` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.1.4: PSA product with the cryogenic return loop
 
@@ -331,9 +331,9 @@ $$\xi_{eff}=\frac{\xi}{1-r(1-\xi)},\qquad\dot n_{H_2}=\xi_{eff}\,\dot n_{H_2,12}
 
 Result type: analytical. Design input: $r$ (see N.4). Specified, not simulated: $\xi$ and $y_{CH_4}$.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::xi_eff` in `engine/plant/src/abatement.rs` and `flowsheet::psa_boundary`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_1_4_psa_loop_with_the_hydrogen_return` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.1.5: gas rate from the hydrogen target
 
@@ -359,9 +359,9 @@ $$\dot n_{NG}=\dot n_{H_2}\,\frac{1/\xi_{eff}+f\,\pi\,(4-\chi)}{Z_{NG}-\chi\,\ba
 
 Result type: analytical given $\psi$, $\omega$, $\kappa$ and $\varphi$. Those four are numerical outputs of the equilibrium reformer (D.11), the shift approach (E.4) and the flash (F.6); the formula does not replace the flowsheet solver, it is the exact relation that the solver result must satisfy. Because every term is proportional to $\dot n_{H_2}$, the gas rate scales linearly with the hydrogen basis. Lower bound from $\psi=\omega=0$: $\dot n_{NG}\ge\dot n_{H_2}/(\xi_{eff}Z_{NG})=1088.6\ \mathrm{kmol\ h^{-1}}$.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::gas_rate_from_h2`, `closed_form::chi` and `closed_form::loop_denominator` in `engine/plant/src/abatement.rs`; the flowsheet reaches the same rate by solving on the hydrogen basis (`flowsheet::solve` with `FeedBasis::Hydrogen`).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_1_5_gas_rate_from_the_hydrogen_target` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.2.1: tube carbon (the recycle loop in closed form)
 
@@ -381,9 +381,9 @@ $$T=\frac{F_C-fP}{D},\qquad D=1-f\,(1-\kappa-\eta\varphi)$$
 
 Result type: analytical. Series view: write $q=f(1-\kappa-\eta\varphi)$, which is below 1. Each turn of the loop returns the fraction $q$ of the carbon that entered it, so $T=(F_C-fP)(1+q+q^2+\dots)=(F_C-fP)/(1-q)$, which is the formula above; the flowsheet's accelerated tear iteration converges to the same sum. $D>0$ for all $0\le f\le1$ whenever $\kappa+\eta\varphi>0$, so the loop always has a solution. Card J.8 is the special case $\kappa=0$ with $\varphi$ replaced by the legacy $\phi_c$.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::loop_denominator` and `closed_form::tube_carbon` in `engine/plant/src/abatement.rs`; the iterated tear is `flowsheet::solve_tears`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_2_1_tube_carbon_closed_form_for_three_tear_starts` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.2.2: the fate of carbon, stream by stream
 
@@ -422,9 +422,9 @@ $$G=(1-\kappa-\eta\varphi)T-P,\quad R=fG,\quad B=(1-f)G,\quad K=\kappa T,\quad C
 
 Result type: analytical given N.2.1. Streams that the flowsheet does not model are not set to zero; they appear in the register of unmodelled streams and in N.6.1.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::fates` and `PlantLedger::shares` in `engine/plant/src/abatement.rs`; the stream carbon is `Model::plant_ledger`, which runs the flowsheet with the registry design inputs (`Model::ledger_spec`).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_2_2_stream_vector_of_the_modelled_streams` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.3.1: captured CO2
 
@@ -450,9 +450,9 @@ Result type: analytical.
 - Literature: none for $\eta$. INL's 99 percent Selexol capture (`ETA_SELEXOL`) applies only to the legacy basis.
 - Not modelled and therefore unknown: any CO2 vented between S19 and S20 (dehydration, compression), new id `CO2_PROC_VENT`, and MEA carbon (make-up and degradation), new id `MEA_CARBON`. They are in the register below with status unknown.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::fates` (field `c`) in `engine/plant/src/abatement.rs`; the capture island is `flowsheet::AnchoredMea` selected by `CaptureSel::Eta` at the specified per-pass capture.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_3_1_captured_co2_is_the_specified_capture_times_the_absorber_co2` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.3.2: plant capture
 
@@ -472,9 +472,9 @@ $$\eta_{pl}=\frac{C}{F_C}=\frac{\eta\varphi\,(1-fP/F_C)}{D}$$
 
 Result type: analytical. This $\eta_{pl}$ is not the legacy column `plant_capture`, which is $C/(C+B)$ (0.903767 in the legacy B_REC_F row).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::plant_capture` in `engine/plant/src/abatement.rs`; the ledger value is `captured / feed` of `CarbonLedger`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_3_2_plant_capture_stays_below_one` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.4.1: the recycle fraction from the plant's own streams
 
@@ -500,9 +500,9 @@ Result type: analytical (an identity of the converged loop).
 - Literature (legacy basis and validation row only): INL Case 6 captured CO2 1927 st/d, Selexol 99 percent, $\phi_c=0.775$ (ids `CO2_CAPTURED_C6`, `ETA_SELEXOL`, `PHI_RECYCLE`).
 - A physical bound that follows from the equations: $0\le f<1$, and N.4.2 ties $f$ to the purge of the feed nitrogen.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::recycle_read_back` in `engine/plant/src/abatement.rs`; the design input is `CarbonParams::cryo_f` read from `CRYO_C_RECOVERY`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_4_1_recycle_fraction_read_back_from_the_streams`, and the validation rows `IND_CRYO_F_READBACK` and `IND_CRYO_F_VS_J7` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.4.2: nitrogen-cut diagnostics
 
@@ -522,9 +522,9 @@ $$B=\beta\,y_{N_2}\,\dot n_{NG},\qquad f=1-\frac{\beta\,y_{N_2}\,\dot n_{NG}}{G}
 
 Result type: analytical. Observation: the cut named "nitrogen-rich" holds only 8.0 mol percent N2 at the current inputs, so the cryogenic specification in `REC-CRYO` is not a sharp N2 separation.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::n2_cut` in `engine/plant/src/abatement.rs`; the feed nitrogen is the `n2_cut` line of `CarbonLedger`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_4_2_nitrogen_balance_of_the_cut` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.4.3: how fragile the INL back-calculation is
 
@@ -544,9 +544,9 @@ $$\frac{\mathrm{d}f_{INL}}{\mathrm{d}\phi}=-\frac{T_6}{\phi}\,\frac{F_{C,6}-C_6-
 
 Result type: analytical (exact derivative; the large-step value 0.6687 is a direct evaluation).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::d_f_inl_d_phi` in `engine/plant/src/abatement.rs`, evaluated against the legacy `Model::carbon`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_4_3_inl_back_calculation_is_fragile` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.4.4: stack carbon as a function of the recycle fraction
 
@@ -585,9 +585,9 @@ $$B_H(f)=\frac{(1-f)\,\big(m\,\bar c\,\dot n_{NG}(f)-P\big)}{1-m\,f},\qquad\dot 
 
 Result type: approximation when $f$ differs from the run it is anchored to, because $\varphi$, $\psi$, $\omega$ and $\kappa$ are held fixed although they change weakly with the recycle composition; analytical (exact) at the converged $f$ of any run. The table is an evaluation of the formula and not a flowsheet result.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::stack_vs_f`, `closed_form::f_for_stack` and `closed_form::stack_at_fixed_h2` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_4_4_stack_carbon_curve` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.5.1: complete combustion of the nitrogen-rich cut
 
@@ -607,9 +607,9 @@ $$\dot n_{CO_2,16}=n_C,\quad\dot n_{H_2O,16}=\tfrac12n_H,\quad\dot n_{N_2,16}=\t
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: unit N2-BURN of `flowsheet::pass` in `engine/plant/src/flowsheet.rs` (complete combustion with the oxygen of the element balance); `closed_form::hydrogen_potential` gives the oxygen demand check.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_5_1_complete_combustion_of_the_cut` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.5.2: direct emission of the plant
 
@@ -629,9 +629,9 @@ $$E_{plant}=\frac{M_{CO_2}\,t_h}{1000}\Big[B+vK+\sum_j\varepsilon_j^{atm}\Big]$$
 
 Result type: analytical. The sum over $\varepsilon_j^{atm}$ is empty only when every listed stream is modelled or specified; otherwise the quantity is reported as a lower bound with the unknown streams named.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::emissions` in `engine/plant/src/emissions.rs` (fields `atm`, `cond_vented`) and `Model::abatement` in `engine/plant/src/abatement.rs`; the carbon lines come from `Model::plant_carbon`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_5_2_direct_emission_is_the_stack_plus_the_vented_condensate` in `engine/plant/tests/m11_carbon.rs`.
 
 # Equations N.6 to N.10: closure, reference plant, annual quantities and abatement
 
@@ -659,9 +659,9 @@ Verdict: undetermined if any status is unknown; else closed if $|\rho|\le\tau_C$
 
 Result type: analytical. Caveat: because every unit is a split, closure is a bookkeeping test. It cannot reveal an error in $\eta$, $f$ or $\varphi$; N.6.2 and the Z-balance of N.1.3 test other things.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `carbon::CarbonLedger::account` and `carbon::closure_report` in `engine/plant/src/carbon.rs`, built on `carbon::close_carbon`; the tolerance is `CarbonParams::closure_tol` read from `CARBON_CLOSURE_TOL`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_6_1_verdicts_are_never_closed_while_a_stream_is_unknown` and `eq_n_6_1_tolerance_and_the_exported_residual` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.6.2: analytical check of the iterated tear
 
@@ -681,9 +681,9 @@ $$\delta_T=\frac{T_{closed}-T_{flow}}{T_{flow}},\qquad\delta_n=\frac{\dot n_{NG}
 
 Result type: analytical comparison against a numerical result.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::tube_carbon` and `closed_form::gas_rate_from_h2` in `engine/plant/src/abatement.rs` against the converged flowsheet.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_6_2_the_tear_check_against_the_closed_forms` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.7.1: process gas of the unabated reference plant
 
@@ -703,9 +703,9 @@ $$\dot n_{proc}=\frac{\dot n_{H_2}}{\xi\,[\,Z_{NG}-(4\psi'+\omega')\bar c\,]},\q
 
 Result type: analytical given $\psi'$ and $\omega'$, which are numerical outputs.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::reference_ledger` and `LedgerKind::Reference` in `engine/plant/src/abatement.rs`: the flowsheet run with `CaptureSel::Off` (`flowsheet::NoCapture`), no recycle and no hydrogen return.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_7_1_reference_process_gas_and_its_limits` and `eq_n_7_floors_lie_below_every_published_reference` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.7.2: firing gas of the reference furnace
 
@@ -730,9 +730,9 @@ Result type: analytical in $\eta_F$ and $Q_F$.
 - Design inputs: the furnace efficiency $\eta_F$ and the net steam-system duty inside $Q_F$ (new ids `REF_FURNACE_EFF`, `REF_STEAM_DUTY`, provenance assumed, no value proposed here).
 - Literature values (validation rows only): INL 52.5 MMSCFD total gas, 3205 st/d CO2, 189.2 MMBtu/h exported steam and 6.3 MWe (ids `NG_CONV_NOCC`, `CO2_CONV_NOCC`, `EXPORT_STEAM_CONV`, `E_CONV_NOCC`), the 44.5 MMSCFD and 2713 st/d nuclear-heated case without capture (`NG_NORECYCLE`, `CO2_HTGR_NOCC`), the IEAGHG 8.996 kg/kg bound and the fleet-average 9.35 kg/kg (`BASELINE_IEAGHG_*`, `BASELINE_CHO`).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::firing_gas` in `engine/plant/src/abatement.rs`. The central result does not call it: the furnace efficiency and the steam duty have no source in the repository, so the reference carries no firing gas and every figure against it is a floor (open issue 2).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_7_2_firing_gas_is_not_negative_and_needs_no_invented_efficiency` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.7.3: direct emission of the reference plant
 
@@ -752,9 +752,9 @@ $$E_{ref}=\frac{M_{CO_2}\,t_h}{1000}\Big[\bar c\,(\dot n_{proc}+\dot n_{fuel})-P
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::abatement` in `engine/plant/src/abatement.rs` (row `PLANT_FLOOR` from the reference ledger, rows `IEAGHG_9p00`, `INL_9p21` and `CHO_9p35` from the published intensities times the annual hydrogen) and `Model::emissions` (fields `baseline_central`, `baseline_id`).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_7_3_reference_identity_on_the_inl_gas_flows` and the validation rows `IND_N73_INL_UNABATED` and `IND_N73_INL_HTGR_NOCC` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.7.4: steam and power terms of the system view
 
@@ -774,9 +774,9 @@ $$E_{lost}=(\dot Q_{exp,ref}-\dot Q_{exp,pl})\,t_h\,\frac{e_{NG}}{\eta_b},\qquad
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `closed_form::system_terms` in `engine/plant/src/abatement.rs` and the legacy `Model::system_adjust` in `engine/plant/src/emissions.rs`, which prints the system view.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_7_4_system_terms_are_added_once` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Boundary of the reference and the cost ladder lines (N.7)
 
@@ -815,9 +815,9 @@ $$t_h=8760\,f_{av}$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::new` in `engine/plant/src/anchored.rs` (field `hours`).
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_8_1_operating_hours` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.8.2: kmol per hour to tonnes per year
 
@@ -837,9 +837,9 @@ $$\dot E=\dot n_C\,M_{CO_2}\,\frac{t_h}{1000}=\dot n_C\times327.695\quad[\mathrm
 
 Result type: analytical. The legacy function `tpy` multiplies by a scale $s$ (Case B over Case A); the independent flowsheet is solved on the Case B basis directly, so no scale appears.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::tpy` in `engine/plant/src/anchored.rs` and `closed_form::tonnes_per_kmol_h` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_8_2_annual_mass_of_a_carbon_flow` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.8.3: annual hydrogen and conversion of external references
 
@@ -859,9 +859,9 @@ $$M_{H_2,y}=\frac{\dot m_{H_2}\,t_h}{1000},\quad\dot n[\mathrm{kmol\ h^{-1}}]=\f
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `nush2_props::units::{st_d_to_kmol_h, mmscfd_to_kmol_h}` and the field `h2_t_y` of `Emissions` in `engine/plant/src/emissions.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_8_3_annual_hydrogen_and_the_unit_conversions` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.1: direct emissions avoided
 
@@ -881,9 +881,9 @@ $$A_{dir}=E_{ref}-E_{plant}$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::emissions` (field `a_direct`) in `engine/plant/src/emissions.rs` and `BaselineRow::a_direct` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_9_1_hand_ledger_of_the_direct_abatement` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.2: where the abatement comes from
 
@@ -908,9 +908,9 @@ Scope of the decomposition. It uses the closure of the modelled streams. If an u
 
 Lower bound for the present flowsheet run: with $\dot n_{ref}\ge1223.99\ \mathrm{kmol\ h^{-1}}$ (N.7.1) and $v=1$, $A_{dir}\ge327.695\times[1108.584+1.05379\times(1223.99-1150.37)]=388700\ \mathrm{t\ y^{-1}}$. It assumes the cryogenic inputs of that run and a reference with no firing gas and complete conversion; it is a floor and not an estimate.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Decomposition` built in `Model::abatement` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_9_2_decomposition_of_the_direct_abatement` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.3: capture-based abatement
 
@@ -930,9 +930,9 @@ $$A_{cap}=k\,C=\frac{M_{CO_2}\,t_h}{1000}\,\eta\,\varphi\,T$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Emissions::captured` and `Abatement::captured_t_y` in `engine/plant/src/emissions.rs` and `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_9_3_capture_based_abatement` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.4: net abatement after transport and storage
 
@@ -952,9 +952,9 @@ $$A_{TS}=A_{dir}-\tau_{TS}\,A_{cap},\qquad\tau_{TS}=\lambda+e_{ship}+w_{TS}\,EF_
 
 Result type: analytical. The plant's own CO2 compression (S19 to S20) is inside the plant; its electricity belongs to the system view (card K.9, not implemented).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::ts_parts`, `closed_form::ts_ratio` and `Model::emissions` (fields `ts_emission`, `a_net`) in `engine/plant/src/abatement.rs` and `engine/plant/src/emissions.rs`; the inputs are the `TS_*` registry entries.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_9_4_net_abatement_after_transport_and_storage` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.9.5: lifecycle view and the gas basis rule
 
@@ -974,9 +974,9 @@ $$A_{LC}=A_{TS}+\Delta G\,\big(e_{up,CO_2}+GWP_H\,e_{up,CH_4}\big)-E_{nuc}$$
 
 Result type: analytical. No value of $GWP_H$ is assumed in this file; the horizon and the report that supplies it are a owner decision (open issue 6).
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Model::lifecycle_terms` in `engine/plant/src/emissions.rs` (the CO2 view) and `closed_form::lifecycle` in `engine/plant/src/abatement.rs`. No value of the warming potential exists in the repository, so the exports carry the CO2 view and the CO2e term stays at its zero default.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_9_5_lifecycle_view_counts_transport_and_storage_once` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.10.1: abatement per kg of hydrogen
 
@@ -996,9 +996,9 @@ $$a_{H_2}=\frac{A}{M_{H_2,y}}$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `BaselineRow::a_h2_net` and `a_h2_direct` in `engine/plant/src/abatement.rs`; the summary key `A_net_per_kg` of `Model::plant_summary`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_10_intensities_and_the_reduction` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.10.2: fractional reduction
 
@@ -1018,9 +1018,9 @@ $$\rho_{red}=\frac{A_{dir}}{E_{ref}}=1-\frac{E_{plant}}{E_{ref}}$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `BaselineRow::reduction` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_10_intensities_and_the_reduction` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.10.3: emission intensity
 
@@ -1040,9 +1040,9 @@ $$ci=\frac{E_{plant}}{M_{H_2,y}},\qquad e_{ref}=\frac{E_{ref}}{M_{H_2,y}}$$
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Abatement::intensity_kg_kg` in `engine/plant/src/abatement.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_10_intensities_and_the_reduction` in `engine/plant/tests/m11_carbon.rs`.
 
 ## Equation N.10.4: reported carbon balance residual
 
@@ -1062,9 +1062,9 @@ $$\text{report}\ \big(\rho,\ \tau_C,\ \text{verdict},\ \{\text{stream},\ \text{s
 
 Result type: analytical.
 
-Rust implementation: to be filled in Phase 3
+Rust implementation: `Abatement::closure` (a `carbon::AccountReport`) in `engine/plant/src/abatement.rs`, written to the emissions ledger as `CLOSURE_ABS`, `CLOSURE_REL` and `CLOSURE_TOL` by `independent_lines` in `engine/plant/src/export.rs`.
 
-Validation test: to be filled in Phase 3
+Validation test: `eq_n_10_4_reported_residual_carries_its_tolerance_and_statuses` in `engine/plant/tests/m11_carbon.rs`.
 
 # Worked numeric example: the central case
 
@@ -1158,6 +1158,12 @@ New ids. The column "Provenance" uses the four allowed labels. "Needs" says what
 | `EF_UPSTREAM_CO2`, `EF_UPSTREAM_CH4` | $e_{up,CO_2}$, $e_{up,CH_4}$ | t/GJ | assumed | none | split of `EF_UPSTREAM` with its heating-value basis (HHV or LHV) stated |
 | `GWP_HORIZON` | $H$ | y | user_decision | none | choice of horizon (open issue 6) |
 | `GWP_CH4` | $GWP_H$ | t CO2e/t CH4 | published | none | value and source report for the chosen horizon |
+
+## Implemented ids (Phase 3)
+
+The registry holds fifteen new entries, all read by `CarbonParams::read` in `engine/plant/src/abatement.rs` and all listed with provenance and source in `engine/data/parameters.toml`. `CARBON_BASIS` (0 legacy, 1 independent) and `CARBON_BASELINE` (0 IEAGHG, 1 INL, 2 Cho) are project decisions D1, D12 and D2. `CRYO_C_RECOVERY` and `CRYO_H2_RETURN` hold f and r to twelve digits, each assumed and calibrated to INL's pair (decision D8). `COND_CO2_VENT` is v and `CARBON_CLOSURE_TOL` is $	au_C$. Nine `TS_*` entries replace the symbolic $\lambda$, $e_{ship}$ and $w_{TS}$ of the table above: ship fuel per tonne and kilometre, its energy content and CO2 factor, the shipping distance, conditioning and injection electricity, terminal and purge shares and the grid factor of the electricity. The distance is the one entry with no source, and it carries a band of 200 to 2000 km.
+
+Not implemented, because no source value exists in the repository: `MEA_CARBON`, `CO2_PROC_VENT`, `REF_FURNACE_EFF`, `REF_STEAM_DUTY`, the split of `EF_UPSTREAM` and the two warming-potential entries. The N2 and O2 fractions stay in `flowsheet.rs`, where the lumped feed is defined.
 
 # Register of streams that the flowsheet does not model
 
