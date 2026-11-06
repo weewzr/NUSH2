@@ -2,6 +2,7 @@
 //! against the same-size unabated SMR. Every call states its size exponent.
 
 use crate::anchored::{crf, sff, Balance, CostLevel, Model, Scenario};
+use crate::subsidy::GrantQuery;
 use nush2_numerics::Result;
 use nush2_props::units::{mw_to_mmbtu_h, MMBTU_GJ};
 use serde::Serialize;
@@ -57,6 +58,10 @@ pub struct CostQuery {
     pub capt_k: Option<f64>,
     pub fom: Option<f64>,
     pub rx_mult: f64,
+    /// Government grant on the first-installation capital. `None` and a share
+    /// of zero leave every result as it was. Independent of `rx_mult`, which
+    /// stays the reactor-cost stress lever (decision D5).
+    pub grant: Option<GrantQuery>,
 }
 
 impl CostQuery {
@@ -75,6 +80,7 @@ impl CostQuery {
             capt_k: None,
             fom: None,
             rx_mult: 1.0,
+            grant: None,
         }
     }
 }
@@ -116,6 +122,18 @@ pub struct CostItems {
     pub annual_captured_t: f64,
 }
 
+/// Net-of-grant block of the ledger, S$M/y, both lines negative. L0 to L5 stay
+/// gross; the block is added after L5.
+///
+/// eq: S.5b
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct NetBlock {
+    /// The grant, annualised over the project life.
+    pub grant_credit: f64,
+    /// The interest during construction that the grant saves, annualised the same way.
+    pub idc_effect: f64,
+}
+
 /// Annual ledger lines, S$M/y.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Ledger {
@@ -135,6 +153,9 @@ pub struct Ledger {
     pub lost_steam: f64,
     pub baseline_power: f64,
     pub export_revenue: f64,
+    /// Present only when the query carries a grant with a non-zero share.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net: Option<NetBlock>,
 }
 
 /// Rungs of the ladder.
@@ -185,6 +206,17 @@ impl Ledger {
     /// eq: L.26
     pub fn l5(&self) -> f64 {
         self.ladder()[5]
+    }
+
+    /// L5 net of the grant, S$M/y: the gross L5 less the grant credit and the
+    /// interest the grant saves. Equal to `l5` when there is no grant.
+    ///
+    /// eq: S.5b
+    pub fn l5_net(&self) -> f64 {
+        match self.net {
+            Some(n) => self.l5() + n.grant_credit + n.idc_effect,
+            None => self.l5(),
+        }
     }
 }
 
@@ -327,10 +359,24 @@ impl Model {
     /// eq: L.23
     /// eq: L.24
     /// eq: L.27
+    /// eq: S.5b
     pub fn ledger(&self, b: &Balance, q: &CostQuery) -> Result<Ledger> {
         let k = self.cost_items(b, q)?;
         let cr25 = crf(self.rate, self.item_life)?;
         let crl = crf(self.rate, q.life)?;
+        // A one-off grant is annualised over the project life (convention 6). A
+        // share of zero takes the unchanged path; any other share, including one
+        // out of range or not a number, goes to `grant_plan`, which checks it.
+        let net = match q.grant {
+            Some(g) if g.share != 0.0 => {
+                let plan = self.grant_plan(&k, &g)?;
+                Some(NetBlock {
+                    grant_credit: -plan.grant * crl,
+                    idc_effect: -plan.ledger_interest_saved * crl,
+                })
+            }
+            _ => None,
+        };
         Ok(Ledger {
             gas: -(k.ng_smr - k.ng_plant) * k.gas_s_m_per_mmscfd,
             reactor_capital: k.reactor_capital * crl,
@@ -348,6 +394,7 @@ impl Model {
             lost_steam: (k.steam_smr_mm - k.steam_plant_mm) * k.steam_s_m_per_mm,
             baseline_power: -k.smr_power_y,
             export_revenue: -k.export_revenue_y,
+            net,
         })
     }
 }

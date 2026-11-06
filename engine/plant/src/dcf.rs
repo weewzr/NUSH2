@@ -172,7 +172,8 @@ impl Model {
         (self.smr_water_eur_y + self.smr_chem_eur_y) / 1e6 * self.f2014 * (s / self.s_b) * hours
     }
 
-    /// Run the DCF for one query, compared with L5 at the same query.
+    /// Run the DCF for one query, compared with L5 at the same query, on the
+    /// abatement of the balance.
     ///
     /// eq: L.28
     /// eq: L.34
@@ -180,6 +181,20 @@ impl Model {
     /// eq: L.36
     /// eq: L.37
     pub fn dcf(&self, b: &Balance, q: &CostQuery) -> Result<DcfResult> {
+        let annual_abatement_t = self.emissions(&b.c, b.s).a_atm;
+        self.dcf_at(b, q, annual_abatement_t)
+    }
+
+    /// Run the DCF for one query on a stated annual net abatement, t/y. With a
+    /// grant in the query the NUS-H2 side carries one GRANT line of negative
+    /// flows, so `lcoh_nush2` and `lac` are net of the grant, L5 is taken net of
+    /// it too, and the gap terms gain a GRANT term. A share of zero takes the
+    /// unchanged path.
+    ///
+    /// eq: S.3a
+    /// eq: S.4a
+    /// eq: S.6b
+    pub fn dcf_at(&self, b: &Balance, q: &CostQuery, annual_abatement_t: f64) -> Result<DcfResult> {
         let k: CostItems = self.cost_items(b, q)?;
         let life = q.life as u32;
         if life == 0 || f64::from(life) != q.life {
@@ -195,7 +210,10 @@ impl Model {
         let (island, island_fom) = self.smr_island(h_s);
         let island_vom = self.smr_island_variable(h_s);
         let annual_h2_t = self.h2_a_kgh * h_s * self.hours / 1000.0;
-        let annual_abatement_t = self.emissions(&b.c, s).a_atm;
+        let plan = match q.grant {
+            Some(g) if g.share != 0.0 => Some(self.grant_plan(&k, &g)?),
+            _ => None,
+        };
 
         let gas_smr = k.ng_smr * k.gas_s_m_per_mmscfd;
         let gas_plant = k.ng_plant * k.gas_s_m_per_mmscfd;
@@ -203,7 +221,7 @@ impl Model {
         let steam_plant = k.steam_plant_mm * k.steam_s_m_per_mm;
 
         use Side::{NusH2, Smr};
-        let lines = vec![
+        let mut lines = vec![
             line(
                 r,
                 "SMR_ISLAND_CAP",
@@ -264,6 +282,9 @@ impl Model {
                 annual(life, -k.export_revenue_y),
             ),
         ];
+        if let Some(p) = &plan {
+            lines.push(line(r, "GRANT", NusH2, p.dcf_flows.clone()));
+        }
 
         let npv =
             |side: Side| -> f64 { lines.iter().filter(|l| l.side == side).map(|l| l.pv).sum() };
@@ -275,7 +296,7 @@ impl Model {
         let lac = (npv_cost_nush2_sm - npv_cost_smr_sm) * 1e6 / npv_abated_t;
 
         let led = self.ledger(b, q)?;
-        let l5 = led.l5() * 1e6 / annual_abatement_t;
+        let l5 = led.l5_net() * 1e6 / annual_abatement_t;
 
         // Each line's share of the gap, in S$/t. The ledger keeps IDC as its own
         // line and folds recycle fixed O&M into the train, so those pair up here.
@@ -298,7 +319,7 @@ impl Model {
                 delta: dcf_s_per_t - l5_s_per_t,
             }
         };
-        let gap_terms = vec![
+        let mut gap_terms = vec![
             term("GAS", led.gas, &["GAS"]),
             term(
                 "REACTOR_CAP_WITH_IDC",
@@ -328,6 +349,10 @@ impl Model {
                 &["STEAM_CREDIT", "PURCHASED_POWER", "EXPORT_REVENUE"],
             ),
         ];
+        // The ledger credits the grant and the interest it saves on one block.
+        if let Some(n) = led.net {
+            gap_terms.push(term("GRANT", n.grant_credit + n.idc_effect, &["GRANT"]));
+        }
 
         Ok(DcfResult {
             stage: q.stage,
