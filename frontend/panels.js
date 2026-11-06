@@ -68,7 +68,7 @@ export function fmtValue(v, unit) {
 // entry with that id, as data-bind does on the drawing. A missing value prints n/a.
 const TOKEN = /\{\{([A-Za-z0-9_.]+)\|(\d)\}\}/g;
 
-function walk(result, path) {
+export function walk(result, path) {
   let v = result;
   for (const k of path.split(".")) {
     if (Array.isArray(v) && !/^\d+$/.test(k)) v = v.find((e) => e && e.id === k);

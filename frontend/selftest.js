@@ -444,6 +444,8 @@ async function tail(checks, base, ref) {
     await sleep(ROUTE_WAIT_MS);
   }
 
+  await tourChecks(add);
+
   const units = base && base.units ? base.units : null;
   const unitEls = Array.from(document.querySelectorAll("[data-unit]"));
   if (!unitEls.length) {
@@ -500,6 +502,606 @@ async function tail(checks, base, ref) {
   const page = document.documentElement.dataset.selftest;
   add("no_console_error", errors.length === 0 && page === "pass",
     `${errors.length} error(s) caught by this test, page shell verdict ${page || "none"}${errors.length ? `: ${errors.slice(0, 5).join(" | ")}` : ""}`);
+}
+
+// ------------------------------------------------------------ process tour
+
+// Animations the browser is running now, and those on the tour's own elements.
+const running = () => document.getAnimations().filter((a) => a.playState === "running");
+const tourRunning = () => running().filter((a) => {
+  const t = a.effect && a.effect.target;
+  return Boolean(t && t.closest && t.closest("#pfd-svg, #tour-card, #tour-bar"));
+});
+
+/** A reply value by the data-bind path convention, resolved here apart from the page code. */
+function resolvePath(res, path) {
+  let v = res;
+  for (const k of path.split(".")) {
+    if (Array.isArray(v) && !/^\d+$/.test(k)) v = v.find((e) => e && e.id === k);
+    else v = v && typeof v === "object" ? v[k] : undefined;
+  }
+  return v && typeof v === "object" && "value" in v ? v.value : v;
+}
+
+/** The text a value must print as: fixed decimals, a fraction as a percentage, n/a for no number. */
+function shownAs(v, unit, d) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "n/a";
+  return (unit === "-" ? v * 100 : v).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+/** Every number in the caption card against its reply field. */
+function captionNumbers() {
+  const out = { count: 0, bad: [] };
+  for (const b of document.querySelectorAll("#tour-card .tn")) {
+    out.count += 1;
+    const want = b.dataset.path ? shownAs(resolvePath(state.lastOk, b.dataset.path), b.dataset.u, Number(b.dataset.d)) : "a reply path";
+    if (b.textContent !== want) out.bad.push(`${b.dataset.path || "a number with no reply path"} shows ${b.textContent}, source ${want}`);
+  }
+  return out;
+}
+
+/** The reply value behind a caption number of the step text, by its path. */
+function textValue(path) {
+  const b = document.querySelector(`#tour-card .tour-text .tn[data-path="${path}"]`);
+  return b ? resolvePath(state.lastOk, path) : undefined;
+}
+
+/** Step 12 against the electricity balance of the reply: the text prints the
+ * generation at the reactor output, and generation plus grid import never
+ * exceeds the site demand; an infeasible plant reads its branch at the need. */
+function powerStepOk(res) {
+  const gen = textValue("balances.energy.electricity_generation.value");
+  const imp = textValue("kpi.unmet_power_mwe");
+  const dem = textValue("units.power.results.e_total.value");
+  const text = document.querySelector("#tour-card .tour-text").textContent;
+  const sums = [gen, imp, dem].every((v) => typeof v === "number") && gen + imp <= dem * (1 + 1e-9) + 1e-9;
+  const need = res.feasibility.feasible !== false || /at the need/i.test(text);
+  return { ok: sums && need, text: `generation ${gen}, import ${imp}, demand ${dem}, need wording ${need}` };
+}
+
+/** The abatement sentence step 13 must carry for this reply. */
+function abatementPhrase(a) {
+  if (a.met) return "is met at these inputs";
+  if (a.at_or_above_target && a.feasible === false) return "does not count the target as met";
+  return "is not met at these inputs";
+}
+
+/** Wait until a smooth page scroll has come to rest. */
+async function settle() {
+  let y = window.scrollY;
+  let still = 0;
+  for (let i = 0; i < 40 && still < 3; i += 1) {
+    await sleep(60);
+    still = window.scrollY === y ? still + 1 : 0;
+    y = window.scrollY;
+  }
+}
+
+/** The focused element lies fully inside the window. */
+function focusInView() {
+  const a = document.activeElement;
+  if (!a || a === document.body) return false;
+  const r = a.getBoundingClientRect();
+  return r.top >= 0 && r.bottom <= window.innerHeight && r.width > 0;
+}
+
+const press = (key) => (document.activeElement || document.body)
+  .dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+
+// The guided tour of the PFD page: its steps name real units, streams and
+// reply fields; it starts from its button, visits every step and exits with no
+// error; each caption number equals its source; the keys work; reduced motion
+// runs no animation and does not advance; the numbers follow the controls; a
+// button the reader steps with keeps focus and stays in view, with the card
+// head in view too when both fit; an automatic step moves neither the page nor
+// the side column; the closing step moves only the lines the earlier steps of
+// the same scenario move.
+async function tourChecks(add) {
+  location.hash = "#pfd";
+  await sleep(ROUTE_WAIT_MS);
+  let tour;
+  try {
+    tour = await import("./tour.js?v=__COMMIT__");
+  } catch (e) {
+    add("tour_steps_bound", false, `the tour did not load: ${e && e.message ? e.message : e}`);
+    return;
+  }
+  await pageSolve(null, true);
+  const ready = await until(() => tour.tourState().ready, LOAD_MS);
+  const a = tour.tourAudit(state.lastOk);
+  const unbound = [...a.missing_units, ...a.missing_streams, ...a.missing_marks, ...a.bad_paths, ...a.bad_keys];
+  add("tour_steps_bound", Boolean(ready) && a.steps > 0 && unbound.length === 0,
+    `${a.steps} steps over ${a.branches} scenario branches; every unit, stream, label key, text key and reply path they name resolves${unbound.length ? `; unbound: ${unbound.join(", ")}` : ""}`);
+
+  const n = a.steps;
+  const reducedOS = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const start = document.getElementById("tour-start");
+  const bar = document.getElementById("tour-bar");
+  const title = document.getElementById("tour-title");
+  const act = (name) => bar.querySelector(`[data-act="${name}"]`);
+
+  // Start from the button, step through with Next, leave with Exit.
+  const texts = [];
+  const spoken = [];
+  try {
+    const errs0 = errors.length;
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    await settle();
+    const st0 = tour.tourState();
+    // Focus goes to the step title, or to a bar control when the title would
+    // sit outside the window; either way the focused element is in view.
+    const focusTitle = (document.activeElement === title || bar.contains(document.activeElement)) && focusInView();
+    const focusOn = document.activeElement === title ? "the step title" : "a bar control";
+    const visited = [];
+    const numBad = [];
+    const motion = [];
+    const unlit = [];
+    let numCount = 0;
+    for (let i = 0; i < n; i += 1) {
+      await sleep(150);
+      const st = tour.tourState();
+      visited.push(st.step + 1);
+      texts.push(document.getElementById("tour-card").textContent);
+      spoken.push(document.querySelector("#tour-card .tour-text").textContent);
+      const nums = captionNumbers();
+      numCount += nums.count;
+      numBad.push(...nums.bad.map((x) => `step ${st.step + 1}: ${x}`));
+      if (!document.querySelector("#pfd-svg .tour-on")) unlit.push(st.step + 1);
+      const dashes = tourRunning().filter((x) => x.effect.target.classList && x.effect.target.classList.contains("tour-flow")).length;
+      if (!reducedOS && st.flows > 0 && dashes === 0) motion.push(`step ${st.step + 1}: no moving dashes`);
+      if (reducedOS && tourRunning().length) motion.push(`step ${st.step + 1}: animation under reduced motion`);
+      if (i < n - 1) act("next").click();
+    }
+    const last = tour.tourState();
+    const endDisabled = act("next").getAttribute("aria-disabled") === "true";
+    act("exit").click();
+    await sleep(100);
+    const left = !tour.tourState().active && document.activeElement === start
+      && !document.querySelector("#pfd-svg .tour-on, #pfd-svg .tour-flow") && document.getElementById("tour-card").hidden;
+    const newErrors = errors.slice(errs0);
+    const inOrder = visited.length === n && visited.every((v, k) => v === k + 1);
+    const fails = [
+      st0.active ? "" : "did not start",
+      focusTitle ? "" : "focus did not move to the step title or a bar control in view",
+      st0.playing === !reducedOS ? "" : `playing ${st0.playing} with reduced motion ${reducedOS}`,
+      inOrder ? "" : `visited ${visited.join(" ")}`,
+      last.step === n - 1 && endDisabled ? "" : "the last step does not end the walk",
+      unlit.length ? `nothing lit on steps ${unlit.join(", ")}` : "",
+      ...motion,
+      left ? "" : "Exit did not close the tour and return focus to the start button",
+      newErrors.length ? `${newErrors.length} error(s): ${newErrors.slice(0, 3).join(" | ")}` : "",
+    ].filter(Boolean);
+    add("tour_plays", fails.length === 0,
+      `started from its button with focus on ${focusOn} in view, ${visited.length} of ${n} steps visited in order, ${reducedOS ? "reduced motion" : "dashes moving on every step with flows"}, exited with focus on the start button${fails.length ? `; ${fails.join("; ")}` : ""}`);
+    add("tour_numbers_live", numCount > 0 && numBad.length === 0,
+      `${numCount} caption numbers over ${n} steps at the default inputs, each equal to its reply field${numBad.length ? `; ${numBad.length} differ: ${numBad.slice(0, 6).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_plays", false, String(e && e.message ? e.message : e));
+  }
+
+  // The prose of every step against the visible text rules, with no
+  // placeholder left and no bare SMR.
+  const all = texts.join(" ");
+  const hits = TEXT_RULES.filter(([, b64, flags]) => new RegExp(atob(b64), flags).test(all)).map(([label]) => label);
+  if (all.includes(String.fromCharCode(0x2014))) hits.push("emdash");
+  if (/\bSMR\b/.test(all)) hits.push("bare SMR");
+  if (/\{\w*\}/.test(all)) hits.push("placeholder");
+  // A number runs into its unit in the text that is read aloud or copied.
+  const glued = spoken.join(" ").match(/[0-9][A-Za-z°$]\S*/g) || [];
+  if (glued.length) hits.push(`number joined to its unit: ${glued.slice(0, 4).join(", ")}`);
+  add("tour_text_rules", texts.length === n && hits.length === 0,
+    `${all.length} characters over ${texts.length} steps${hits.length ? `; rules hit: ${hits.join(", ")}` : ", every number spaced from its unit"}`);
+
+  // Keys: arrows step, Space pauses, Escape closes an open stream tip first
+  // and then the tour, with focus back on the start button.
+  try {
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    press("ArrowRight");
+    const s1 = tour.tourState().step;
+    press("ArrowLeft");
+    const s0 = tour.tourState().step;
+    const p0 = tour.tourState().playing;
+    press(" ");
+    const p1 = tour.tourState().playing;
+    press(" ");
+    const p2 = tour.tourState().playing;
+    const spaceOk = reducedOS ? !p0 && !p1 && !p2 : p0 && !p1 && p2;
+    const g = document.querySelector('#pfd-svg [data-stream="S12"]');
+    const tip = document.getElementById("pfd-tip");
+    g.focus();
+    // A headless page without window focus moves focus but fires no focus
+    // event, so the event that opens the stream tip is sent here.
+    if (tip.hidden) g.dispatchEvent(new FocusEvent("focus"));
+    const tipOpen = !tip.hidden;
+    press("Escape");
+    const tipFirst = tip.hidden && tour.tourState().active;
+    press("Escape");
+    const out = !tour.tourState().active && document.activeElement === start;
+    const buttons = [start, ...bar.querySelectorAll("[data-act]"), ...document.querySelectorAll("#tour-card [data-act]")].every((b) => b.tagName === "BUTTON" && b.type === "button");
+    add("tour_keyboard", s1 === 1 && s0 === 0 && spaceOk && tipOpen && tipFirst && out && buttons,
+      `ArrowRight to step ${s1 + 1}, ArrowLeft to step ${s0 + 1}, Space ${reducedOS ? "no play under reduced motion" : `playing ${p0} then ${p1} then ${p2}`}, Escape closed the stream tip first ${tipFirst}, then the tour with focus on the start button ${out}, every control a button ${buttons}`);
+  } catch (e) {
+    add("tour_keyboard", false, String(e && e.message ? e.message : e));
+  } finally {
+    tour.exitTour(false);
+  }
+
+  // Reduced motion: still steps, nothing running, no auto-advance, no Play.
+  try {
+    await sleep(600);
+    const before = running().length;
+    tour.startTour({ reduced: true });
+    const bad = [];
+    for (let i = 0; i < n; i += 1) {
+      tour.goTour(i);
+      await sleep(60);
+      const extra = running().length - before;
+      if (extra > 0 || tourRunning().length) bad.push(`step ${i + 1}: ${extra} more running`);
+      if (document.querySelector("#pfd-svg .tour-flow")) bad.push(`step ${i + 1}: dashes drawn`);
+    }
+    tour.goTour(0);
+    await sleep(400);
+    const st = tour.tourState();
+    const stays = st.step === 0 && !st.playing && st.still;
+    const noPlay = act("play").hidden;
+    tour.exitTour(false);
+    add("tour_reduced_motion", bad.length === 0 && stays && noPlay,
+      `${n} still steps with ${before} animation(s) running before and none added, stays on step ${st.step + 1}, Play hidden ${noPlay}${bad.length ? `; ${bad.slice(0, 5).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_reduced_motion", false, String(e && e.message ? e.message : e));
+  }
+
+  // Auto-advance at a fast test pace runs to the last step and stops there;
+  // the play-speed dwell of every step lies between 6 and 8 s, under 2 min in all.
+  try {
+    const dwellOk = a.dwell_ms.every((ms) => ms >= 6000 && ms <= 8000) && a.total_ms < 120000;
+    let detail;
+    let pass;
+    if (reducedOS) {
+      start.click();
+      await sleep(500);
+      const st = tour.tourState();
+      tour.exitTour(false);
+      pass = dwellOk && st.active && st.step === 0 && !st.playing;
+      detail = `reduced motion: stays on step ${st.step + 1}, playing ${st.playing}`;
+    } else {
+      tour.startTour({ scale: 0.02 });
+      const done = await until(() => tour.tourState().ended, 10000);
+      const st = tour.tourState();
+      tour.exitTour(false);
+      pass = Boolean(done) && dwellOk && st.step === n - 1 && !st.playing;
+      detail = `ran to step ${st.step + 1} of ${n} and stopped, playing ${st.playing}`;
+    }
+    add("tour_autoplay", pass, `${detail}; dwell ${Math.min(...a.dwell_ms) / 1000} to ${Math.max(...a.dwell_ms) / 1000} s a step, ${a.total_ms / 1000} s in all`);
+  } catch (e) {
+    add("tour_autoplay", false, String(e && e.message ? e.message : e));
+  }
+
+  // The numbers follow the controls. At a rating below the need, step 1
+  // shows the engine's infeasibility reason and the new rating, steps 2 and 3
+  // read the IHX and process heat at the need, step 12 prints the generation
+  // at the reactor output with generation plus import within the demand, and
+  // step 13 states the abatement verdict the engine gives. Case A, where the
+  // heat fits the rating and the power branch falls short, is checked on
+  // steps 12 and 13 the same way.
+  try {
+    const at = async (id) => { tour.goTour(a.ids.indexOf(id)); await sleep(60); return document.querySelector("#tour-card .tour-text").textContent; };
+    const res = await pageSolve({ rating_mwth: 100 }, true);
+    tour.startTour({ reduced: true, step: 0 });
+    await sleep(80);
+    const warn = document.querySelector("#tour-card .tour-warn");
+    const warnOk = Boolean(res && res.feasibility && res.feasibility.feasible === false && warn && warn.textContent.includes(res.feasibility.reason));
+    const bad = [...captionNumbers().bad];
+    let count = captionNumbers().count;
+    const rating = document.querySelector('#tour-card .tn[data-path="kpi.rating_mwth"]');
+    const ratingOk = Boolean(rating && rating.textContent === shownAs(resolvePath(res, "kpi.rating_mwth"), "MWth", 0));
+    const short = (resolvePath(res, "balances.energy.unmet_thermal") || 0) > 0;
+    const needOk = !short || ((await at("primary")).includes("At the need") && (await at("secondary")).includes("At the need"));
+    await at("power");
+    const p100 = powerStepOk(res);
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    const v100 = (await at("closing")).includes(abatementPhrase(res.targets.abatement));
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    tour.exitTour(false);
+    const resA = await pageSolve({ basis: "case_a" }, true);
+    tour.startTour({ reduced: true, step: a.ids.indexOf("power") });
+    await sleep(80);
+    const pA = powerStepOk(resA);
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    const vA = (await at("closing")).includes(abatementPhrase(resA.targets.abatement));
+    bad.push(...captionNumbers().bad);
+    count += captionNumbers().count;
+    tour.exitTour(false);
+    await pageSolve(null, true);
+    add("tour_follows_controls", warnOk && ratingOk && needOk && p100.ok && v100 && pA.ok && vA && bad.length === 0,
+      `rating 100 MWth: infeasibility reason shown ${warnOk}, rating shown ${rating ? rating.textContent : "none"}, IHX and process heat at the need ${needOk}, step 12 ${p100.text}, abatement verdict "${abatementPhrase(res.targets.abatement)}" stated ${v100}; Case A: step 12 ${pA.text}, abatement verdict "${abatementPhrase(resA.targets.abatement)}" stated ${vA}; ${count} numbers equal to the reply${bad.length ? `; ${bad.slice(0, 4).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_follows_controls", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // Where the tour keeps things in view: the window, cut to the side column
+  // when that column scrolls by itself and holds the element.
+  const card = document.getElementById("tour-card");
+  const head = card.querySelector(".tour-head");
+  const side = card.parentElement;
+  const sideScrolls = () => ["auto", "scroll"].includes(getComputedStyle(side).overflowY);
+  const shownIn = (e) => {
+    let lo = 0;
+    let hi = window.innerHeight;
+    if (sideScrolls() && side.contains(e)) {
+      const s = side.getBoundingClientRect();
+      lo = Math.max(lo, s.top);
+      hi = Math.min(hi, s.bottom);
+    }
+    return [lo, hi];
+  };
+  // Wait until the page and the side column stop scrolling.
+  const rest = async () => {
+    let key = "";
+    let calm = 0;
+    for (let i = 0; i < 50 && calm < 3; i += 1) {
+      await sleep(60);
+      const now = `${window.scrollY}|${side.scrollTop}`;
+      calm = now === key ? calm + 1 : 0;
+      key = now;
+    }
+  };
+  const whole = (b) => {
+    const r = b.getBoundingClientRect();
+    const [lo, hi] = shownIn(b);
+    // The ring is a 2 px outline 2 px off the button.
+    const ok = r.width > 0 && r.top - 4 >= lo - 0.5 && r.bottom + 4 <= hi + 0.5;
+    return { ok, at: `${Math.round(r.top)}..${Math.round(r.bottom)} px, shown ${Math.round(lo)}..${Math.round(hi)} px` };
+  };
+  // The card head must show whole after a step the reader asked for whenever
+  // it fits with the control used, with 8 px of room on each side and 1 px
+  // to spare against rounding.
+  const headFits = (b) => {
+    const h = head.getBoundingClientRect();
+    const r = b.getBoundingClientRect();
+    const [hl, hh] = shownIn(head);
+    const [bl, bh] = shownIn(b);
+    const fits = Math.max(h.bottom, r.bottom) - Math.min(h.top, r.top) + 16 <= Math.min(hh, bh) - Math.max(hl, bl) - 1;
+    const seen = h.top >= hl - 0.5 && h.bottom <= hh + 0.5;
+    return { fits, seen, at: `head ${Math.round(h.top)}..${Math.round(h.bottom)} px with the button at ${Math.round(r.top)}..${Math.round(r.bottom)} px` };
+  };
+  const heads = { fit: 0, seen: 0, apart: 0, bad: [] };
+  const headAfter = (b, at) => {
+    const v = headFits(b);
+    if (!v.fits) heads.apart += 1;
+    else if (v.seen) heads.fit += 1;
+    else heads.bad.push(`${at}: ${v.at}`);
+    if (v.seen) heads.seen += 1;
+  };
+
+  // A button the reader steps with keeps focus, and the button with its focus
+  // ring lies whole inside the window and inside the side column when that
+  // column scrolls. The card's own buttons step to the end and back, then
+  // the bar's Next steps to the end again.
+  try {
+    start.click();
+    await until(() => tour.tourState().active, 2000);
+    await rest();
+    if (tour.tourState().playing) act("play").click();
+    const bad = [];
+    let moves = 0;
+    const stepWith = async (b, label) => {
+      b.focus();
+      await rest();
+      for (let k = 0; k < n - 1; k += 1) {
+        b.click();
+        await rest();
+        moves += 1;
+        const at = `${label}, step ${tour.tourState().step + 1}`;
+        if (document.activeElement !== b) {
+          bad.push(`${at}: focus moved off the button`);
+          continue;
+        }
+        const w = whole(b);
+        if (!w.ok) bad.push(`${at}: button at ${w.at}`);
+        headAfter(b, at);
+      }
+    };
+    await stepWith(card.querySelector('[data-act="next"]'), "card Next");
+    const atEnd = tour.tourState().step === n - 1;
+    await stepWith(card.querySelector('[data-act="prev"]'), "card Previous");
+    const atStart = tour.tourState().step === 0;
+    await stepWith(act("next"), "bar Next");
+    const done = tour.tourState().step === n - 1;
+    tour.exitTour(false);
+    add("tour_focus_kept", bad.length === 0 && atEnd && atStart && done && moves === 3 * (n - 1),
+      `${moves} step changes by the card's buttons and the bar's Next${reducedOS ? " under reduced motion" : ""}; the button kept focus and showed whole with its ring on every step ${bad.length === 0}; ends reached ${atEnd && atStart && done}${bad.length ? `; ${bad.slice(0, 5).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_focus_kept", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // The card head comes into view with the control after a step the reader
+  // asks for, whenever the two fit together. Besides the step changes above,
+  // the card's Next steps to the end and its Previous back with the button
+  // first placed near the top of where it shows, so that a shorter card
+  // moves the button up and out of view. These run on still steps, where the
+  // scrolls jump, to keep the test short; the rule is the same.
+  try {
+    const bad = [];
+    let moves = 0;
+    tour.startTour({ reduced: true, step: 0 });
+    await rest();
+    if (tour.tourState().playing) act("play").click();
+    const nearTop = async (b, label) => {
+      b.focus({ preventScroll: true });
+      for (let k = 0; k < n - 1; k += 1) {
+        const [lo] = shownIn(b);
+        const dy = Math.round(b.getBoundingClientRect().top - (lo + 12));
+        if (sideScrolls() && side.contains(b)) side.scrollBy({ top: dy, behavior: "instant" });
+        else window.scrollBy({ top: dy, behavior: "instant" });
+        await sleep(40);
+        b.click();
+        await rest();
+        moves += 1;
+        const at = `${label} from near the top, step ${tour.tourState().step + 1}`;
+        if (document.activeElement !== b) {
+          bad.push(`${at}: focus moved off the button`);
+          continue;
+        }
+        const w = whole(b);
+        if (!w.ok) bad.push(`${at}: button at ${w.at}`);
+        headAfter(b, at);
+      }
+    };
+    await nearTop(card.querySelector('[data-act="next"]'), "card Next");
+    const atEnd = tour.tourState().step === n - 1;
+    await nearTop(card.querySelector('[data-act="prev"]'), "card Previous");
+    const atStart = tour.tourState().step === 0;
+    tour.exitTour(false);
+    bad.push(...heads.bad);
+    const total = 3 * (n - 1) + moves;
+    add("tour_head_shown", bad.length === 0 && atEnd && atStart && moves === 2 * (n - 1) && heads.fit + heads.apart === total,
+      `${total} step changes by the card's buttons and the bar's Next, ${moves} of them with the button first near the top; head and button fit together on ${heads.fit + heads.bad.length} and the head showed whole on each of them ${heads.bad.length === 0}; on the other ${heads.apart} the button came first; button whole with focus on every one ${bad.length === heads.bad.length}${bad.length ? `; ${bad.slice(0, 5).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_head_shown", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // An automatic step leaves the page and the side column where the reader
+  // put them, also with focus on a tour button out of view: the bar's Play
+  // with the page scrolled down to the card, or as far as the page goes, and
+  // the card's Next with the page at the drawing. Where the side column
+  // scrolls, it is moved off its top as well. The tour runs with motion at a
+  // test pace in every run, reduced motion included, since the timer is under
+  // test here. The first case plays on from Start with the focus Start gave
+  // (Play, on windows too short for the step title) and the page scrolled
+  // down to the card.
+  try {
+    const docY = (e, edge) => window.scrollY + e.getBoundingClientRect()[edge];
+    const maxY = () => document.documentElement.scrollHeight - window.innerHeight;
+    const atCard = () => Math.max(docY(card, "top") - 8, docY(bar, "bottom") + 10);
+    const cases = [
+      ["bar Play, page at the card", () => act("play"), atCard, 120],
+      ["card Next, page at the drawing", () => card.querySelector('[data-act="next"]'),
+        () => docY(document.getElementById("pfd-svg"), "top") - 8, 60],
+    ];
+    const bad = [];
+    const parts = [];
+    {
+      const label = "Start, page at the card";
+      tour.startTour({ reduced: false, scale: 0.4 });
+      await rest();
+      const f = document.activeElement;
+      const fName = f === act("play") ? "Play" : f === document.getElementById("tour-title") ? "the step title" : (f && f.tagName) || "none";
+      window.scrollTo({ top: Math.max(0, Math.min(maxY(), Math.round(atCard()))), behavior: "instant" });
+      if (sideScrolls()) side.scrollTo({ top: 120, behavior: "instant" });
+      await sleep(120);
+      const y0 = window.scrollY;
+      const s0 = side.scrollTop;
+      const step0 = tour.tourState().step;
+      const playing0 = tour.tourState().playing;
+      const hidden = !whole(f).ok;
+      const moved = await until(() => tour.tourState().step !== step0, 6000);
+      const step1 = tour.tourState().step;
+      if (tour.tourState().playing) act("play").click();
+      await sleep(250);
+      await rest();
+      const y1 = window.scrollY;
+      const s1 = side.scrollTop;
+      const kept = document.activeElement === f;
+      tour.exitTour(false);
+      if (!playing0) bad.push(`${label}: the tour was not playing after Start`);
+      if (!moved) bad.push(`${label}: no automatic step within 6 s`);
+      if (y1 !== y0) bad.push(`${label}: the page moved from ${y0} to ${y1} px`);
+      if (s1 !== s0) bad.push(`${label}: the side column moved from ${s0} to ${s1} px`);
+      if (!kept) bad.push(`${label}: focus left ${fName}`);
+      parts.push(`${label}: step ${step0 + 1} to ${step1 + 1} by the timer with focus on ${fName} ${hidden ? "out of view" : "in view"}, page at ${y0} px${sideScrolls() ? `, side column at ${s0} px` : ""}`);
+    }
+    for (const [label, btnOf, yOf, sideTop] of cases) {
+      tour.startTour({ reduced: false, scale: 0.1 });
+      await rest();
+      if (tour.tourState().playing) act("play").click();
+      const b = btnOf();
+      b.focus({ preventScroll: true });
+      window.scrollTo({ top: Math.max(0, Math.min(maxY(), Math.round(yOf()))), behavior: "instant" });
+      if (sideScrolls()) side.scrollTo({ top: sideTop, behavior: "instant" });
+      await rest();
+      const y0 = window.scrollY;
+      const s0 = side.scrollTop;
+      const step0 = tour.tourState().step;
+      const hidden = !whole(b).ok;
+      act("play").click();
+      const moved = await until(() => tour.tourState().step !== step0, 4000);
+      const step1 = tour.tourState().step;
+      if (tour.tourState().playing) act("play").click();
+      await sleep(250);
+      await rest();
+      const y1 = window.scrollY;
+      const s1 = side.scrollTop;
+      const kept = document.activeElement === b;
+      tour.exitTour(false);
+      if (!moved) bad.push(`${label}: no automatic step within 4 s`);
+      if (y1 !== y0) bad.push(`${label}: the page moved from ${y0} to ${y1} px`);
+      if (s1 !== s0) bad.push(`${label}: the side column moved from ${s0} to ${s1} px`);
+      if (!kept) bad.push(`${label}: focus left the button`);
+      parts.push(`${label}: step ${step0 + 1} to ${step1 + 1} by the timer with the button ${hidden ? "out of view" : "in view"}, page at ${y0} px${sideScrolls() ? `, side column at ${s0} px` : ""}`);
+    }
+    add("tour_auto_stays", bad.length === 0,
+      `${parts.join("; ")}${bad.length ? `; ${bad.join("; ")}` : "; neither moved and focus stayed"}`);
+  } catch (e) {
+    add("tour_auto_stays", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
+
+  // The closing step moves the lines that the steps before it move in the
+  // same scenario, and no other line, for each reject route: under Selexol it
+  // leaves the MEA regeneration lines dark as steps 10 and 11 do. Its dashes
+  // run on those lines only.
+  try {
+    const lines = Array.from(document.querySelectorAll("#pfd-svg .pfd-streams > [data-stream]")).map((g) => g.dataset.stream);
+    const pathOf = (id) => {
+      const g = document.querySelector(`#pfd-svg .pfd-streams > [data-stream="${id}"]`);
+      const p = g && (g.querySelector("path.core") || g.querySelector("path.vent"));
+      return p ? p.getAttribute("d") : null;
+    };
+    const parts = [];
+    const bad = [];
+    for (const route of ["recycle", "export", "burn_on_site", "inl_selexol"]) {
+      const res = await pageSolve({ tail_gas: route }, true);
+      if (!res || !res.inputs || res.inputs.tail_gas !== route) {
+        bad.push(`${route}: no reply`);
+        continue;
+      }
+      tour.startTour({ reduced: true, step: 0 });
+      const moved = new Set();
+      for (let i = 0; i < n - 1; i += 1) {
+        tour.goTour(i);
+        for (const g of document.querySelectorAll("#pfd-svg .pfd-streams > .tour-move")) moved.add(g.dataset.stream);
+      }
+      tour.exitTour(false);
+      tour.startTour({ reduced: false, step: n - 1 });
+      const lit = new Set(Array.from(document.querySelectorAll("#pfd-svg .pfd-streams > .tour-on")).map((g) => g.dataset.stream));
+      const litPaths = new Set([...lit].map(pathOf));
+      const dashes = Array.from(document.querySelectorAll("#pfd-svg .tour-flow")).map((p) => p.getAttribute("d"));
+      tour.exitTour(false);
+      const extra = lines.filter((id) => lit.has(id) && !moved.has(id));
+      const lost = lines.filter((id) => moved.has(id) && !lit.has(id));
+      const stray = dashes.filter((d) => !litPaths.has(d)).length;
+      if (extra.length) bad.push(`${route}: closing moves ${extra.join(" ")}, which no earlier step moves`);
+      if (lost.length) bad.push(`${route}: closing leaves out ${lost.join(" ")}`);
+      if (stray || dashes.length !== lit.size) bad.push(`${route}: ${dashes.length} dash paths for ${lit.size} lines, ${stray} off them`);
+      const dark = lines.filter((id) => !lit.has(id));
+      parts.push(`${route} ${lit.size} lines moving, dark ${dark.length ? dark.join(" ") : "none"}`);
+    }
+    await pageSolve(null, true);
+    add("tour_closing_lines", bad.length === 0 && parts.length === 4,
+      `${parts.join("; ")}${bad.length ? `; ${bad.slice(0, 6).join("; ")}` : ""}`);
+  } catch (e) {
+    add("tour_closing_lines", false, String(e && e.message ? e.message : e));
+    tour.exitTour(false);
+  }
 }
 
 if (ON) {
