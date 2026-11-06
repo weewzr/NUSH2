@@ -181,7 +181,7 @@ impl Model {
     /// eq: L.36
     /// eq: L.37
     pub fn dcf(&self, b: &Balance, q: &CostQuery) -> Result<DcfResult> {
-        let annual_abatement_t = self.emissions(&b.c, b.s).a_atm;
+        let annual_abatement_t = self.emissions(&b.c, b.s).a_net;
         self.dcf_at(b, q, annual_abatement_t)
     }
 

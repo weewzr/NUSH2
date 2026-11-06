@@ -28,13 +28,27 @@ struct Ctx {
 
 fn build(p: ParamSet) -> Ctx {
     let m = Model::new(&p).unwrap();
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
+    let a = m.emissions(&b.c, b.s).a_net;
     Ctx { p, m, b, a }
 }
 
-/// The Headline model of the exporter, with the registry flags of decision D7b.
+/// The Headline model of the exporter, with the registry flags of decision D7b,
+/// on the legacy carbon basis. The closed forms of the derivation and their
+/// literal anchors were written on the annual abatement of that basis; the share
+/// of the subsidy model does not depend on where the abatement comes from.
 fn ctx() -> &'static Ctx {
+    static C: OnceLock<Ctx> = OnceLock::new();
+    C.get_or_init(|| {
+        let mut p = Inputs::headline().params().unwrap();
+        p.set("CARBON_BASIS", 0.0).unwrap();
+        build(p)
+    })
+}
+
+/// The same model on the default carbon basis, which the committed tables are
+/// written on.
+fn ctx_committed() -> &'static Ctx {
     static C: OnceLock<Ctx> = OnceLock::new();
     C.get_or_init(|| build(Inputs::headline().params().unwrap()))
 }
@@ -48,6 +62,7 @@ fn ctx_s1() -> &'static Ctx {
         p.set("SUBSIDY_ELIG_B_CAPTURE", 0.0).unwrap();
         p.set("SUBSIDY_ELIG_B_RECYCLE", 0.0).unwrap();
         p.set("SUBSIDY_ELIG_B_POWER_ISLAND", 1.0).unwrap();
+        p.set("CARBON_BASIS", 0.0).unwrap();
         build(p)
     })
 }
@@ -458,7 +473,7 @@ fn eq_s_9b_a_zero_share_changes_nothing_bit_for_bit() {
 
 #[test]
 fn eq_s_9b_zero_subsidy_reproduces_the_committed_ledger_and_dcf() {
-    let c = ctx();
+    let c = ctx_committed();
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../results/Economic_Ledger.csv"
@@ -2045,7 +2060,7 @@ fn table() -> Vec<Row> {
 
 #[test]
 fn eq_s_8_the_committed_table_matches_the_engine() {
-    let c = ctx();
+    let c = ctx_committed();
     let rows = table();
     // 4 stages, 2 lives, 2 eligible sets, 2 timings, each with 4 grid shares for
     // 2 methods and 3 break-even rows.

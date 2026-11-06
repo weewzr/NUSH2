@@ -109,6 +109,91 @@ impl CarbonLedger {
         )
     }
 
+    /// The carbon account of the plant: every stream the flowsheet models, the
+    /// ones fixed by a specification, and the register of streams it does not
+    /// model (U1 to U9 of the derivation), each with its status. `v` is the
+    /// share of the condensate CO2 that reaches the air.
+    ///
+    /// eq: N.6.1
+    pub fn account(&self, v: f64) -> Vec<Entry> {
+        let known = |id, what, inlet, x: f64, to_air| Entry {
+            id,
+            what,
+            inlet,
+            kmol_c_h: Some(x),
+            status: Status::Modelled,
+            to_air,
+        };
+        let unknown = |id, what, inlet, to_air| Entry {
+            id,
+            what,
+            inlet,
+            kmol_c_h: None,
+            status: Status::Unknown,
+            to_air,
+        };
+        let specified = |id, what| Entry {
+            id,
+            what,
+            inlet: false,
+            kmol_c_h: Some(0.0),
+            status: Status::Specified,
+            to_air: false,
+        };
+        vec![
+            known("FEED", "fresh natural gas, S01", true, self.feed, false),
+            unknown("U1_IN", "MEA make-up carbon, inlet", true, false),
+            known(
+                "CAPTURED",
+                "CO2 to storage, S20",
+                false,
+                self.captured,
+                false,
+            ),
+            known(
+                "STACK",
+                "nitrogen-rich cut burned, S16",
+                false,
+                self.burned,
+                true,
+            ),
+            known(
+                "PRODUCT",
+                "methane in the hydrogen product, S13",
+                false,
+                self.product,
+                false,
+            ),
+            known(
+                "CONDENSATE",
+                "CO2 dissolved in the condensate, S10",
+                false,
+                self.condensate,
+                v > 0.0,
+            ),
+            unknown("U1_OUT", "MEA degradation carbon, outlets", false, true),
+            unknown("U2", "CO2 vented between S19 and S20", false, true),
+            unknown("U4B", "leakage after S20", false, true),
+            Entry {
+                id: "U5",
+                what: "fuel for steam and grid electricity",
+                inlet: false,
+                kmol_c_h: None,
+                status: Status::OutOfBoundary,
+                to_air: true,
+            },
+            unknown("U6", "start-up, flaring and fugitive methane", false, true),
+            specified(
+                "U7",
+                "carry-over in the PSA product, zero by the 99.9 / 0.1 mol% product",
+            ),
+            specified(
+                "U8",
+                "gases dissolved in the condensate, zero in the flash model",
+            ),
+        ]
+    }
+
     /// Recycled share of the tail-gas carbon, the quantity INL's split fixes.
     ///
     /// eq: J.10
@@ -122,6 +207,132 @@ impl CarbonLedger {
     /// eq: K.14
     pub fn capture_pair(&self) -> (f64, f64) {
         (self.captured / self.co2_abs, self.captured / self.feed)
+    }
+}
+
+/// Knowledge status of one carbon stream in the account (equation N.6.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Status {
+    /// Computed by the flowsheet.
+    Modelled,
+    /// Fixed by a stated specification, with its reason.
+    Specified,
+    /// Present in the plant and not modelled. The flow is absent, never zero.
+    Unknown,
+    /// Outside the plant envelope by definition.
+    OutOfBoundary,
+}
+
+impl Status {
+    pub fn label(self) -> &'static str {
+        match self {
+            Status::Modelled => "modelled",
+            Status::Specified => "specified",
+            Status::Unknown => "unknown",
+            Status::OutOfBoundary => "out_of_boundary",
+        }
+    }
+}
+
+/// One line of the carbon account. `kmol_c_h` is `None` for a stream whose size
+/// the repository does not know.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct Entry {
+    pub id: &'static str,
+    pub what: &'static str,
+    pub inlet: bool,
+    pub kmol_c_h: Option<f64>,
+    pub status: Status,
+    /// True when the stream, or part of it, can reach the atmosphere.
+    pub to_air: bool,
+}
+
+/// Verdict of a closure test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Verdict {
+    Closed,
+    Open,
+    Undetermined,
+}
+
+impl Verdict {
+    pub fn label(self) -> &'static str {
+        match self {
+            Verdict::Closed => "closed",
+            Verdict::Open => "open",
+            Verdict::Undetermined => "undetermined",
+        }
+    }
+}
+
+/// Closure report of the account (equations N.6.1 and N.10.4).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AccountReport {
+    /// Absolute residual over every entry, `None` while a stream is unknown.
+    pub residual: Option<f64>,
+    pub relative: Option<f64>,
+    pub tol: f64,
+    /// Residual over the modelled and specified entries only.
+    pub residual_modelled: Option<f64>,
+    pub relative_modelled: Option<f64>,
+    /// Closed or open on the modelled and specified entries.
+    pub on_modelled: Verdict,
+    /// Never closed while a stream is unknown.
+    pub overall: Verdict,
+    pub unknown: Vec<&'static str>,
+    pub out_of_boundary: Vec<&'static str>,
+}
+
+fn verdict(c: Option<CarbonClosure>, tol: f64) -> Verdict {
+    match c {
+        None => Verdict::Undetermined,
+        Some(c) if c.relative_residual.abs() <= tol => Verdict::Closed,
+        Some(_) => Verdict::Open,
+    }
+}
+
+/// Close the account at tolerance `tol`. A stream with unknown status makes the
+/// overall verdict undetermined, and a missing flow is never entered as zero.
+///
+/// eq: N.6.1
+/// eq: N.10.4
+pub fn closure_report(entries: &[Entry], tol: f64) -> AccountReport {
+    let counted = |e: &&Entry| e.status != Status::OutOfBoundary;
+    let known = |e: &&Entry| matches!(e.status, Status::Modelled | Status::Specified);
+    let flows = |inlet: bool, keep: &dyn Fn(&&Entry) -> bool| -> Vec<Option<f64>> {
+        entries
+            .iter()
+            .filter(|e| e.inlet == inlet)
+            .filter(|e| keep(e))
+            .map(|e| e.kmol_c_h)
+            .collect()
+    };
+    let all = close_carbon(&flows(true, &counted), &flows(false, &counted));
+    let modelled = close_carbon(&flows(true, &known), &flows(false, &known));
+    let unknown: Vec<&'static str> = entries
+        .iter()
+        .filter(|e| e.status == Status::Unknown)
+        .map(|e| e.id)
+        .collect();
+    let overall = if unknown.is_empty() {
+        verdict(all, tol)
+    } else {
+        Verdict::Undetermined
+    };
+    AccountReport {
+        residual: all.map(|c| c.residual_kmol_c_h),
+        relative: all.map(|c| c.relative_residual),
+        tol,
+        residual_modelled: modelled.map(|c| c.residual_kmol_c_h),
+        relative_modelled: modelled.map(|c| c.relative_residual),
+        on_modelled: verdict(modelled, tol),
+        overall,
+        unknown,
+        out_of_boundary: entries
+            .iter()
+            .filter(|e| e.status == Status::OutOfBoundary)
+            .map(|e| e.id)
+            .collect(),
     }
 }
 

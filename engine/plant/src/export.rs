@@ -25,7 +25,7 @@
 //! on a Level 3 result read `flowsheet_m8`, and a sweep point that did not solve
 //! reads `not_converged` with empty results.
 
-use crate::anchored::{Balance, Case, CostLevel, Model, Route, Scenario};
+use crate::anchored::{Balance, CarbonSrc, Case, CostLevel, Model, Route, Scenario};
 use crate::carbon::carbon_kmol_h;
 use crate::dcf::DcfResult;
 use crate::drift::{self, TermRecord};
@@ -47,6 +47,29 @@ use nush2_units::stream::{EnergyKind, ModelClass, Port, Sp};
 
 /// Status of every result row at this milestone.
 pub const STATUS: &str = "anchored_port";
+/// Status of a row whose carbon lines come from the plant's own stream ledger.
+pub const CARBON_STATUS: &str = "carbon_independent";
+
+/// Status word of a row by the basis of its carbon lines.
+fn carbon_status(src: CarbonSrc) -> &'static str {
+    match src {
+        CarbonSrc::Plant => CARBON_STATUS,
+        CarbonSrc::Anchored => STATUS,
+    }
+}
+
+/// Source text of a row by the basis of its carbon lines.
+fn carbon_source(src: CarbonSrc) -> &'static str {
+    match src {
+        CarbonSrc::Plant => "engine plant carbon ledger (Level 3 flowsheet, equations N.2 to N.10)",
+        CarbonSrc::Anchored => "engine anchored port",
+    }
+}
+
+/// True for the two statuses that mark a port row eligible for the preset word.
+fn is_port_status(s: &str) -> bool {
+    s == STATUS || s == CARBON_STATUS
+}
 /// Status of rows computed by the Level 3 flowsheet.
 pub const FLOWSHEET_STATUS: &str = "flowsheet_m7";
 /// Status of rows computed by the M8 models on real flows.
@@ -226,7 +249,7 @@ fn mark(head: String, anch: &str, word: Option<&str>) -> Result<String> {
         let hc = cells(h);
         let ac = cells(a);
         let differs = hc.len() != ac.len() || !same_cells(&hc[..hc.len() - 1], &ac[..ac.len() - 1]);
-        if i > 0 && differs && hc.last().map(String::as_str) == Some(STATUS) {
+        if i > 0 && differs && hc.last().is_some_and(|s| is_port_status(s)) {
             out.push_str(&with_status(h, word));
         } else {
             out.push_str(h);
@@ -253,7 +276,7 @@ fn mark_modelled(text: String, word: Option<&str>) -> String {
         let c = cells(line);
         let differs = c.len() > 8
             && c[0] == "B_REC_F_MODELLED"
-            && c.last().map(String::as_str) == Some(STATUS)
+            && c.last().is_some_and(|s| is_port_status(s))
             && anchored
                 .get(&c[1])
                 .is_some_and(|v| !same_cells(v, &c[5..8]));
@@ -401,7 +424,7 @@ fn run_def(id: &str) -> Result<RunDef> {
 }
 
 fn balance_for(m: &Model, r: &RunDef) -> Result<Balance> {
-    m.balance(r.scn, &m.opts(m.scale(r.case)))
+    m.plant_balance(r.scn, &m.opts(m.scale(r.case)))
 }
 
 /// All tables from one parameter set on the recorded gates.
@@ -551,7 +574,13 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
     drift_block(p, rec, &mut rows)?;
     rows.sort_by(|a, b| a.id.cmp(&b.id));
     for r in rows {
-        let status = row_status(&r.id, marks);
+        let plant_row =
+            r.group == "carbon" || matches!(r.id.as_str(), "RES_NG_MMSCFD" | "RES_SOLVENT_T_H");
+        let status = if m.carbon_params.independent() && plant_row {
+            CARBON_STATUS.to_string()
+        } else {
+            row_status(&r.id, marks)
+        };
         c.row(&[
             r.id,
             t(r.group),
@@ -606,9 +635,9 @@ fn input_row(c: &mut Csv, e: &ParamEntry) {
 /// eq: K.6
 /// eq: K.22
 fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
-    let sb = m.case_summary(Scenario::RecF, m.s_b)?;
-    let sa_inl = m.case_summary(Scenario::InlSel, 1.0)?;
-    let sa_mea = m.case_summary(Scenario::RecF, 1.0)?;
+    let sb = m.plant_summary(Scenario::RecF, m.s_b)?;
+    let sa_inl = m.plant_summary(Scenario::InlSel, 1.0)?;
+    let sa_mea = m.plant_summary(Scenario::RecF, 1.0)?;
     // id, summary key, group, unit, equation, decision
     let keys: [(&str, &str, &str, &str, &str, &str); 44] = [
         ("RES_H2_KG_H", "h2_kg_h", "production", "kg/h", "J.2", "D03"),
@@ -860,7 +889,17 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         ),
     ];
     for (id, key, group, unit, equation, decision) in keys {
-        let parameter = if id == "RES_ABATEMENT_IEAGHG_T_Y" {
+        let parameter = if m.carbon_params.independent() && id == "RES_ABATEMENT_T_Y" {
+            format!(
+                "Net abatement after transport and storage against the central reference, {}",
+                m.carbon_params.baseline.id()
+            )
+        } else if m.carbon_params.independent() && id == "RES_BASELINE_T_Y" {
+            format!(
+                "Unabated reference, central: {} times the annual hydrogen",
+                m.carbon_params.baseline.id()
+            )
+        } else if id == "RES_ABATEMENT_IEAGHG_T_Y" {
             format!(
                 "Abatement on the IEAGHG bound of {:.6} kg/kg, unrounded: 0.8091 kg CO2/Nm3 over \
                  0.08994 kg H2/Nm3, IEAGHG 2017-02 Table 2",
@@ -880,6 +919,71 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
             equation,
             decision,
         });
+    }
+    for (id, key, unit, eq, what) in [
+        (
+            "RES_ABATEMENT_DIRECT_T_Y",
+            "A_dir_t_y",
+            "t/y",
+            "N.9.1",
+            "Direct abatement against the central reference, before transport and storage",
+        ),
+        (
+            "RES_TS_EMISSION_T_Y",
+            "ts_emission_t_y",
+            "t/y",
+            "N.9.4",
+            "CO2 emitted by conditioning, shipping, injection and storage operations",
+        ),
+        (
+            "RES_TS_RATIO",
+            "tau_ts",
+            "t/t",
+            "N.9.4",
+            "Transport and storage emissions per tonne of CO2 delivered",
+        ),
+        (
+            "RES_STACK_T_Y",
+            "stack_t_y",
+            "t/y",
+            "N.5.2",
+            "Stack CO2 of the burned nitrogen-rich cut",
+        ),
+        (
+            "RES_COND_VENTED_T_Y",
+            "cond_vented_t_y",
+            "t/y",
+            "N.5.2",
+            "Condensate CO2 that reaches the air",
+        ),
+        (
+            "RES_ABATEMENT_PER_KG",
+            "A_net_per_kg",
+            "kg/kg",
+            "N.10.1",
+            "Net abatement per kg of hydrogen",
+        ),
+        (
+            "RES_CARBON_CLOSURE_REL",
+            "closure_rel",
+            "-",
+            "N.10.4",
+            "Relative carbon residual on the modelled streams",
+        ),
+    ] {
+        if sb.contains_key(key) {
+            rows.push(ResultRow {
+                id: id.to_string(),
+                group: "carbon",
+                parameter: what.to_string(),
+                b: sb.get(key).copied(),
+                a_inl: sa_inl.get(key).copied(),
+                a_mea: sa_mea.get(key).copied(),
+                unit,
+                equation: eq,
+                decision: "D07",
+            });
+        }
     }
     let one =
         |id: &str, parameter: String, v: f64, unit: &'static str, eq: &'static str| ResultRow {
@@ -1021,8 +1125,8 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         equation: "J.6",
         decision: "",
     });
-    let bb = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&bb.c, m.s_b).a_atm;
+    let bb = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&bb.c, m.s_b).a_net;
     rows.push(ResultRow {
         id: "RES_TARGET_ABATEMENT_MARGIN_T_Y".into(),
         group: "cost",
@@ -1110,7 +1214,7 @@ pub fn dcf_grid(m: &Model, b: &Balance) -> Result<Vec<(DcfResult, f64)>> {
         for life in [m.lives[0], m.lives[2]] {
             for n in [m.n_linear, m.n_team, m.n_ngnp] {
                 let q = CostQuery::central(stage, life, n, m.r_rated);
-                let l3 = m.ledger(b, &q)?.l3() * 1e6 / m.emissions(&b.c, b.s).a_atm;
+                let l3 = m.ledger(b, &q)?.l3() * 1e6 / m.emissions(&b.c, b.s).a_net;
                 out.push((m.dcf(b, &q)?, l3));
             }
         }
@@ -1119,7 +1223,7 @@ pub fn dcf_grid(m: &Model, b: &Balance) -> Result<Vec<(DcfResult, f64)>> {
 }
 
 fn dcf_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
     for (d, l3) in dcf_grid(m, &b)? {
         let tag = format!("{}_{}Y_{}", d.stage.id(), d.life_y, n_tag(d.n));
         let mut add = |prefix: &str, name: &str, v: f64, unit: &'static str, eq: &'static str| {
@@ -1809,6 +1913,10 @@ fn anchored_mass_run(
     let s = m.scale(r.case);
     let b = balance_for(m, &r)?;
     let k = b.c;
+    let vented_condensate = match k.src {
+        CarbonSrc::Plant => m.carbon_params.cond_vent * k.cond,
+        CarbonSrc::Anchored => 0.0,
+    };
     let h2_kmol = m.h2_a_kgh * s * k.h_scale / MW_H2;
     let h2_feed = h2_kmol / m.psa_rec;
     let cap = k.cap * s;
@@ -1870,7 +1978,9 @@ fn anchored_mass_run(
             },
             co2: None,
             ch4: None,
-            carbon: Some(k.burn * s),
+            // The cut alone: the vented condensate CO2 of the plant's ledger sits
+            // in `burn` for the site total and is not part of this stream.
+            carbon: Some((k.burn - vented_condensate) * s),
             rigour: "reduced_order",
         },
         S {
@@ -1994,8 +2104,13 @@ fn anchored_mass_run(
             opt(x.carbon),
             t("calculated"),
             t(x.rigour),
-            t("engine anchored port, carbon ledger J.8 to J.11"),
-            t(STATUS),
+            t(match k.src {
+                CarbonSrc::Plant => {
+                    "engine plant carbon ledger, Level 3 flowsheet run at the hydrogen target"
+                }
+                CarbonSrc::Anchored => "engine anchored port, carbon ledger J.8 to J.11",
+            }),
+            t(carbon_status(k.src)),
         ]);
     }
     let env = fs_run
@@ -2021,7 +2136,7 @@ fn anchored_mass_run(
             "CLOSURE_CARBON",
             "Carbon residual",
             Some(k.closure * s),
-            STATUS,
+            carbon_status(k.src),
             23,
         ),
         (
@@ -2972,15 +3087,28 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
     let s = m.scale(r.case);
     let b = balance_for(m, &r)?;
     let e = m.emissions(&b.c, s);
+    let src = b.c.src;
+    let status = carbon_status(src);
+    let source = carbon_source(src);
     let h2 = m.h2_a_kgh * s * b.c.h_scale * m.hours / 1000.0;
     let per_pass = if r.scn == Scenario::InlSel {
         m.eta_sel
     } else {
         m.eta_mea
     };
-    let plant = e.captured / (e.captured + e.atm);
+    // Plant capture: carbon stored over fresh carbon on the plant's ledger
+    // (equation N.3.2), the share of stored over stored plus emitted on the
+    // anchored one.
+    let plant = match src {
+        CarbonSrc::Plant => b.c.cap / b.c.f,
+        CarbonSrc::Anchored => e.captured / (e.captured + e.atm),
+    };
     let sys = m.system_adjust(&b, s);
     let lc = m.lifecycle_terms(&b, s, b.r);
+    let abatement_name = match src {
+        CarbonSrc::Plant => "Direct abatement",
+        CarbonSrc::Anchored => "Net abatement",
+    };
     for (bid, base) in [
         ("CHO_9p35", m.base_cho * h2),
         ("IEAGHG_9p00", m.base_ieaghg * h2),
@@ -2995,7 +3123,7 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                     ("BASELINE", "Unabated SMR baseline", base, "K.3"),
                     ("CAPTURED", "Captured and stored", e.captured, "K.7"),
                     ("N2_RICH_CUT", "Residual to atmosphere", e.atm, "K.8"),
-                    ("ABATEMENT", "Net abatement", a, "K.11"),
+                    ("ABATEMENT", abatement_name, a, "K.11"),
                 ],
             ),
             (
@@ -3042,7 +3170,12 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
             ),
             (
                 "system",
-                vec![("ABATEMENT", "Net abatement", a + sys, "K.18")],
+                vec![(
+                    "ABATEMENT",
+                    "Net abatement",
+                    a + sys - e.ts_emission,
+                    "K.18",
+                )],
             ),
         ];
         for (view, lines) in views {
@@ -3058,17 +3191,233 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                     num(per_pass),
                     num(plant),
                     t("calculated"),
-                    t("engine anchored port"),
+                    t(source),
                     t(eq),
-                    t(STATUS),
+                    t(status),
                 ]);
             }
         }
     }
+    if src == CarbonSrc::Plant {
+        independent_lines(c, m, run_id, &b, per_pass, plant)?;
+    }
     Ok(())
 }
 
-/// Class, source, source status and equation of each ledger line.
+/// Lines of the independent carbon view of one run: the annual quantities of the
+/// plant's own ledger, the transport and storage emissions by source, the direct
+/// and net abatement against each reference, the reduction, the intensity and the
+/// closure of the carbon account. The decomposition of the central abatement
+/// (equation N.9.2) closes the view.
+fn independent_lines(
+    c: &mut Csv,
+    m: &Model,
+    run_id: &str,
+    b: &Balance,
+    per_pass: f64,
+    plant: f64,
+) -> Result<()> {
+    let s = b.s;
+    let ab = m.abatement(b, s)?;
+    let h2 = ab.h2_t_y;
+    let view = "independent_carbon";
+    let mut line = |bid: &str, id: &str, name: String, v: f64, per_kg: bool, eq: &str| {
+        c.row(&[
+            t(run_id),
+            t(bid),
+            t(view),
+            t(id),
+            t(&name),
+            // Residuals and the tolerance are far below the six decimals of `num`.
+            if eq == "N.10.4" || eq == "N.6.1" {
+                sci6(v)
+            } else {
+                num(v)
+            },
+            if per_kg { num(v / h2) } else { String::new() },
+            num(per_pass),
+            num(plant),
+            t("calculated"),
+            t(carbon_source(CarbonSrc::Plant)),
+            t(eq),
+            t(CARBON_STATUS),
+        ]);
+    };
+    line(
+        "PLANT",
+        "CAPTURED",
+        "CO2 delivered to storage".into(),
+        ab.captured_t_y,
+        true,
+        "N.9.3",
+    );
+    line(
+        "PLANT",
+        "STACK",
+        "Stack CO2 of the burned cut".into(),
+        ab.stack_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "COND_VENT",
+        format!(
+            "Condensate CO2 vented, share {:.2}",
+            m.carbon_params.cond_vent
+        ),
+        ab.cond_vented_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "RESIDUAL_DIRECT",
+        "Residual direct emission, modelled streams only".into(),
+        ab.residual_direct_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "TS_EMISSIONS",
+        "Transport and storage emissions".into(),
+        ab.ts_emission_t_y,
+        true,
+        "N.9.4",
+    );
+    for (id, part) in ab.ts.lines() {
+        line(
+            "PLANT",
+            id,
+            format!("{id} per tonne delivered times the stored CO2"),
+            part * ab.captured_t_y,
+            true,
+            "N.9.4",
+        );
+    }
+    line(
+        "PLANT",
+        "TS_RATIO",
+        "Transport and storage emissions per tonne delivered, t/t".into(),
+        ab.tau_ts,
+        false,
+        "N.9.4",
+    );
+    for row in &ab.rows {
+        let tag = if row.id == ab.central {
+            " (central)"
+        } else {
+            ""
+        };
+        line(
+            row.id,
+            "BASELINE_INDEP",
+            format!("Unabated reference{tag}"),
+            row.e_ref_t_y,
+            true,
+            "N.7.3",
+        );
+        line(
+            row.id,
+            "ABATEMENT_DIRECT",
+            format!("Direct abatement{tag}"),
+            row.a_direct,
+            true,
+            "N.9.1",
+        );
+        line(
+            row.id,
+            "ABATEMENT_NET",
+            format!("Net abatement after transport and storage{tag}"),
+            row.a_net,
+            true,
+            "N.9.4",
+        );
+        line(
+            row.id,
+            "REDUCTION",
+            format!("Share of the reference emission avoided{tag}"),
+            row.reduction,
+            false,
+            "N.10.2",
+        );
+    }
+    line(
+        "PLANT",
+        "INTENSITY",
+        "Direct CO2 per kg of hydrogen".into(),
+        ab.intensity_kg_kg,
+        false,
+        "N.10.3",
+    );
+    let cl = &ab.closure;
+    let tpy = m.tpy(1.0, s);
+    if let (Some(abs), Some(rel)) = (cl.residual_modelled, cl.relative_modelled) {
+        let unknown = if cl.unknown.is_empty() {
+            "none".to_string()
+        } else {
+            cl.unknown.join(" ")
+        };
+        line(
+            "PLANT",
+            "CLOSURE_ABS",
+            format!(
+                "Carbon residual on the modelled streams, verdict {}; whole account {}; unknown streams {unknown}",
+                cl.on_modelled.label(),
+                cl.overall.label()
+            ),
+            abs * tpy,
+            false,
+            "N.10.4",
+        );
+        line(
+            "PLANT",
+            "CLOSURE_REL",
+            "Relative carbon residual on the modelled streams".into(),
+            rel,
+            false,
+            "N.10.4",
+        );
+    }
+    line(
+        "PLANT",
+        "CLOSURE_TOL",
+        "Closure tolerance".into(),
+        cl.tol,
+        false,
+        "N.6.1",
+    );
+    if let Some(d) = ab.decomposition {
+        line(
+            "PLANT",
+            "DECOMP_CAPTURED",
+            "Abatement from captured CO2".into(),
+            d.captured,
+            true,
+            "N.9.2",
+        );
+        line(
+            "PLANT",
+            "DECOMP_AVOIDED_GAS",
+            "Abatement from the gas not bought".into(),
+            d.avoided_gas,
+            true,
+            "N.9.2",
+        );
+        line(
+            "PLANT",
+            "DECOMP_CONDENSATE",
+            "Condensate term".into(),
+            d.condensate,
+            true,
+            "N.9.2",
+        );
+    }
+    Ok(())
+}
+
+// Class, source, source status and equation of each ledger line.
 fn line_meta(id: &str) -> (&'static str, &'static str, &'static str, &'static str) {
     match id {
         "GAS" => (
@@ -3183,7 +3532,7 @@ fn economic_ledger(m: &Model) -> Result<String> {
     let exponents = [m.n_linear, m.n_team, m.n_ngnp];
     for r in RUNS {
         let b = balance_for(m, &r)?;
-        let a = m.emissions(&b.c, b.s).a_atm;
+        let a = m.emissions(&b.c, b.s).a_net;
         let headline = r.id == "B_REC_F";
         let stages: Vec<Stage> = if headline {
             Stage::ALL.to_vec()
@@ -3532,7 +3881,7 @@ fn subsidy_scenarios(m: &Model) -> Result<String> {
     let mut c = Csv::new(&SUBSIDY_HEADER);
     let run = run_def("B_REC_F")?;
     let b = balance_for(m, &run)?;
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let a = m.emissions(&b.c, b.s).a_net;
     let charged = crate::charged(m, run.case, &b);
     let sp = &m.subsidy;
     for stage in Stage::ALL {

@@ -304,6 +304,21 @@ pub struct FlowsheetSpec {
     /// recycle S03 instead of the nitrogen-rich cut. False is the default split;
     /// true is the one recorded sensitivity of decision S11.
     pub h2_rest_to_recycle: bool,
+    /// Capture island of the run. `Model` keeps the columns the scenario names.
+    pub capture: CaptureSel,
+}
+
+/// Which capture island a run uses. The independent carbon basis states the
+/// per-pass capture itself (`Eta`) and builds the unabated reference without
+/// any capture (`Off`).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub enum CaptureSel {
+    /// The columns of the scenario at the capture of the model.
+    Model,
+    /// The MEA island at the stated per-pass capture.
+    Eta(f64),
+    /// No capture island: S12 equals S11 and S19 is empty.
+    Off,
 }
 
 impl FlowsheetSpec {
@@ -325,11 +340,16 @@ impl FlowsheetSpec {
             s_to_c: S_TO_C,
             k_source: KSource::Zhang,
             h2_return,
-            carbon_recycle: recycle_fraction(m),
+            carbon_recycle: if m.carbon_params.independent() {
+                m.carbon_params.cryo_f
+            } else {
+                recycle_fraction(m)
+            },
             psa_recovery: m.psa_rec,
             ch4_in_product: m.ch4_in_h2,
             solvent_tear: true,
             h2_rest_to_recycle: false,
+            capture: CaptureSel::Model,
         }
     }
 
@@ -372,6 +392,14 @@ impl FlowsheetSpec {
                 return Err(EngineError::Range {
                     param: name.into(),
                     msg: format!("{v} must lie between 0 and 1"),
+                });
+            }
+        }
+        if let CaptureSel::Eta(e) = self.capture {
+            if !(e > 0.0 && e <= 1.0) {
+                return Err(EngineError::Range {
+                    param: "capture_eta".into(),
+                    msg: format!("{e} must lie in (0, 1]"),
                 });
             }
         }
@@ -587,6 +615,35 @@ impl CaptureColumns for AnchoredMea {
             q_in_w: q_reb,
             w_in_w: w_pump + w_fans,
             records: vec![abs_rec, strip_rec],
+        })
+    }
+}
+
+/// No capture island, for the unabated reference: the absorber feed passes on as
+/// the treated gas and the stripper delivers nothing.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NoCapture;
+
+impl CaptureColumns for NoCapture {
+    fn id(&self) -> &'static str {
+        "no capture island (unabated reference)"
+    }
+    fn solvent_loop(&self) -> bool {
+        false
+    }
+    fn lean_start(&self) -> f64 {
+        0.0
+    }
+    fn solve(&self, feed: &Stream, _lean_alpha: f64) -> Result<CaptureOut> {
+        Ok(CaptureOut {
+            treated: Stream::gas("S12", ABSORBER_OUT.t_k(), ABSORBER_OUT.p_pa(), feed.n),
+            co2: Stream::gas("S19", CO2_LOW.t_k(), CO2_LOW.p_pa(), [0.0; NSP]),
+            rich: None,
+            lean_in: None,
+            lean_out: None,
+            q_in_w: 0.0,
+            w_in_w: 0.0,
+            records: Vec::new(),
         })
     }
 }
@@ -1463,8 +1520,14 @@ pub fn hts_train_opts(k_source: KSource) -> Result<TrainOpts> {
 }
 
 fn capture_for(m: &Model, spec: &FlowsheetSpec, s: f64) -> Box<dyn CaptureColumns> {
-    match spec.scenario {
-        Scenario::InlSel => Box::new(AnchoredSelexol {
+    match (spec.capture, spec.scenario) {
+        (CaptureSel::Off, _) => Box::new(NoCapture),
+        (CaptureSel::Eta(eta), scn) if scn != Scenario::InlSel => {
+            let mut island = AnchoredMea::from_model(m);
+            island.eta = eta;
+            Box::new(island)
+        }
+        (_, Scenario::InlSel) => Box::new(AnchoredSelexol {
             eta: m.eta_sel,
             w_e: m.e_rows.purification * s * 1.0e6,
         }),
@@ -2173,12 +2236,23 @@ pub fn base_closure_cached() -> Result<H2ReturnClosure> {
         .clone()
 }
 
+/// The H2 return fraction every suite run carries. The independent basis runs the
+/// registry design input; the closure on INL's pair stays in the suite as the
+/// check that the input still reproduces it. The legacy basis runs the closure.
+pub fn suite_h2_return(m: &Model, closure: &H2ReturnClosure) -> f64 {
+    if m.carbon_params.independent() {
+        m.carbon_params.cryo_r
+    } else {
+        closure.h2_return
+    }
+}
+
 /// Close the H2 return, then run Case A and Case B on both scenarios at 871 C
 /// and Case B REC_F at 825 C and 800 C (S8), all on the hydrogen basis except
 /// the closure run.
 pub fn suite(m: &Model) -> Result<Suite> {
     let closure = close_h2_return(m)?;
-    let r = closure.h2_return;
+    let r = suite_h2_return(m, &closure);
     let mut runs = Vec::new();
     let mut b_rec = None;
     for (case, scn) in [

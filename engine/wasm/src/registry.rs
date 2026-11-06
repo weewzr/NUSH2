@@ -17,6 +17,7 @@ pub enum Target {
     Case,
     Scenario,
     HeatBasis,
+    CarbonBasis,
     Stage,
     Life,
     Exponent,
@@ -143,6 +144,19 @@ const HEAT_BASIS: &[Opt] = &[
         value: "ahn_2026",
         label: "Ahn 2026 process heat, helium flow following duty",
         tag: "sensitivity",
+    },
+];
+
+const CARBON_BASIS: &[Opt] = &[
+    Opt {
+        value: "independent",
+        label: "Plant's own carbon balance, generic reference intensity",
+        tag: "central",
+    },
+    Opt {
+        value: "legacy",
+        label: "Legacy ledger anchored to the INL values",
+        tag: "reference",
     },
 ];
 
@@ -293,6 +307,16 @@ pub const SPECS: &[Spec] = &[
         "Engine sensitivity HEAT_BASIS",
         "Ahn basis sets process heat to the Ahn Case B value and scales helium flow with duty",
     ),
+    pick(
+        "carbon_basis",
+        "Carbon basis",
+        "Plant basis",
+        Target::CarbonBasis,
+        CARBON_BASIS,
+        "independent",
+        "Project decisions D1 and D12",
+        "The independent basis computes captured and emitted CO2 from the plant's own stream ledger; the legacy basis keeps the ledger anchored to the INL values",
+    ),
     num(
         "rating_mwth",
         "Reactor rating",
@@ -376,6 +400,30 @@ pub const SPECS: &[Spec] = &[
         0.005,
         1.0,
         "Per-pass capture on absorber-inlet CO2",
+    ),
+    num(
+        "cryo_c_recovery",
+        "Cryogenic carbon recovery",
+        "Capture",
+        "-",
+        "CRYO_C_RECOVERY",
+        (0.0, 1.0),
+        (0.729852, 0.771783),
+        0.005,
+        1.0,
+        "Design input of the unsimulated cryogenic unit; the central value carries INL information (decision D8)",
+    ),
+    num(
+        "cryo_h2_return",
+        "Cryogenic hydrogen return",
+        "Capture",
+        "-",
+        "CRYO_H2_RETURN",
+        (0.0, 1.0),
+        (0.87163, 0.97163),
+        0.005,
+        1.0,
+        "Design input of the unsimulated cryogenic unit; the band has no source (decision D8)",
     ),
     num(
         "srd",
@@ -805,7 +853,11 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ("q_reboiler_mw", "MEA regeneration duty", "MW"),
     ("reboiler_gap_mw", "Reboiler heat from reactor steam", "MW"),
     ("e_aux_mwe", "Auxiliary electricity", "MWe"),
-    ("abatement_t_y", "Annual abatement, INL baseline", "t/y"),
+    (
+        "abatement_t_y",
+        "Annual abatement, net of transport and storage, central reference",
+        "t/y",
+    ),
     ("abatement_cho_t_y", "Annual abatement, Cho baseline", "t/y"),
     (
         "abatement_ieaghg_t_y",
@@ -843,6 +895,24 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ("solvent_t_h", "Lean solvent rate", "t/h"),
     ("target_abatement_t_y", "Abatement target", "t/y"),
     ("target_cost_s_per_t", "Cost target", "S$/t"),
+    ("co2_ts_t_y", "CO2 emitted by transport and storage", "t/y"),
+    (
+        "abatement_direct_t_y",
+        "Annual direct abatement, before transport and storage",
+        "t/y",
+    ),
+    (
+        "abatement_kg_per_kg",
+        "Net abatement per kg of hydrogen",
+        "kg/kg",
+    ),
+    ("reduction", "Share of the reference emission avoided", "-"),
+    ("intensity_kg_kg", "Direct CO2 per kg of hydrogen", "kg/kg"),
+    (
+        "carbon_residual_rel",
+        "Relative carbon residual on the modelled streams",
+        "-",
+    ),
 ];
 
 /// Number of required keys at the head of `KPIS`.

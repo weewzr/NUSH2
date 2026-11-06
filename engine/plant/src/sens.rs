@@ -17,7 +17,7 @@
 //! A point that errors writes `not_converged` rows with empty results, so the
 //! sweep stays visible.
 
-use crate::anchored::{Balance, BalanceOpts, Model, Scenario};
+use crate::anchored::{Balance, BalanceOpts, CarbonSrc, Model, Scenario};
 use crate::economics::{CostQuery, Stage};
 use crate::params::ParamSet;
 use nush2_numerics::{EngineError, Result};
@@ -155,6 +155,9 @@ struct Point<'a> {
 
 #[derive(Clone, Copy, PartialEq)]
 enum Baseline {
+    /// The central reference of the basis: INL on the legacy basis, the one
+    /// `CARBON_BASELINE` names on the independent basis.
+    Central,
     Inl,
     Cho,
     Ieaghg,
@@ -169,7 +172,7 @@ const CENTRAL: Point<'static> = Point {
     stage: Stage::Boak,
     n: None,
     r_at_need: false,
-    baseline: Baseline::Inl,
+    baseline: Baseline::Central,
     adj: NO_ADJUST,
     cost: NO_COST,
 };
@@ -181,7 +184,10 @@ fn adjust(m: &Model, b: &mut Balance, a: Adjust) {
     b.cap_t *= a.cap;
     b.c.burn *= a.atm;
     b.c.exported *= a.atm;
-    if a.vent_kmol_h != 0.0 {
+    b.c.cond *= a.atm;
+    // On the independent basis the condensate CO2 is a ledger line with its own
+    // vent share, so the legacy transfer from the captured stream does not apply.
+    if a.vent_kmol_h != 0.0 && b.c.src == CarbonSrc::Anchored {
         let before = b.c.cap;
         b.c = m.vent_condensate(&b.c, b.s, a.vent_kmol_h);
         if before > 0.0 {
@@ -208,14 +214,20 @@ fn solve(base: &ParamSet, pt: Point<'_>) -> Result<Solved> {
     let s = m.s_b;
     let mut o = m.opts(s);
     (pt.tweak)(&m, &mut o);
-    let mut b = m.balance(pt.scn, &o)?;
+    let mut b = m.plant_balance(pt.scn, &o)?;
     adjust(&m, &mut b, pt.adj);
     let h2 = m.h2_a_kgh * s * b.c.h_scale * m.hours / 1000.0;
-    let a = m.emissions(&b.c, s).a_atm
+    // Offsets are differences to the reference the basis centres on.
+    let central_kg = match b.c.src {
+        CarbonSrc::Plant => m.baseline_kg_kg(m.carbon_params.baseline),
+        CarbonSrc::Anchored => m.base_inl,
+    };
+    let a = m.emissions(&b.c, s).a_net
         + match pt.baseline {
-            Baseline::Inl => 0.0,
-            Baseline::Cho => (m.base_cho - m.base_inl) * h2,
-            Baseline::Ieaghg => (m.base_ieaghg - m.base_inl) * h2,
+            Baseline::Central => 0.0,
+            Baseline::Inl => (m.base_inl - central_kg) * h2,
+            Baseline::Cho => (m.base_cho - central_kg) * h2,
+            Baseline::Ieaghg => (m.base_ieaghg - central_kg) * h2,
         };
     let r = if pt.r_at_need { b.r } else { m.r_rated };
     let n = pt.n.unwrap_or(m.n_linear);
@@ -442,8 +454,8 @@ enum Method {
 /// eq: L.31
 pub fn levers(base: &ParamSet) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let target = m.target_c;
     let cost = |method: Method, q: CostQuery| -> Result<f64> {
         Ok(match method {
@@ -552,7 +564,7 @@ pub fn levers(base: &ParamSet) -> Result<Vec<SensRow>> {
 /// Life sweep at BOAK, n = 1.0, the rated reactor charged: both methods and
 /// both LCOH at each life the ledger carries, against the 25 y values.
 fn life_rows(m: &Model, b: &Balance) -> Result<Vec<SensRow>> {
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let a = m.emissions(&b.c, b.s).a_net;
     let at = |life: f64| -> Result<[f64; 5]> {
         let q = CostQuery::central(Stage::Boak, life, m.n_linear, m.r_rated);
         let l = m.ledger(b, &q)?;
@@ -603,7 +615,7 @@ fn life_rows(m: &Model, b: &Balance) -> Result<Vec<SensRow>> {
 /// unabated SMR making the same extra H2.
 fn backup_rows(m: &Model, b: &Balance) -> Vec<SensRow> {
     let s = b.s;
-    let a0 = m.emissions(&b.c, s).a_atm;
+    let a0 = m.emissions(&b.c, s).a_net;
     let conv = m.backup(s);
     let heat = m.backup_heater(b, s);
     let routes: [(f64, &str, [f64; 3]); 4] = [
@@ -667,7 +679,7 @@ fn backup_rows(m: &Model, b: &Balance) -> Vec<SensRow> {
 pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
     let central = evaluate(base, CENTRAL)?;
-    let b0 = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let b0 = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
     let mut w = Sweep {
         rows: Vec::new(),
         base,
@@ -713,6 +725,73 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
         m.ts.central,
         &[m.ts.low, m.ts.central, m.ts.high],
     );
+    if m.carbon_params.independent() {
+        // The independent basis puts the cryogenic design inputs, the condensate
+        // vent, the central reference and the shipping distance in the table, so
+        // the abatement and the cost can be read against each (decision D8).
+        let band = |id: &str| {
+            base.entries()
+                .find(|e| e.id == id)
+                .and_then(|e| e.low.zip(e.high))
+        };
+        let cp = &m.carbon_params;
+        if let Some((lo, hi)) = band("CRYO_C_RECOVERY") {
+            w.values(
+                "CRYO_RECOVERY",
+                "CRYO_C_RECOVERY",
+                "Cryogenic carbon recovery",
+                "-",
+                cp.cryo_f,
+                &[lo, cp.cryo_f, hi],
+            );
+        }
+        if let Some((lo, hi)) = band("CRYO_H2_RETURN") {
+            w.values(
+                "CRYO_H2_RETURN",
+                "CRYO_H2_RETURN",
+                "Cryogenic hydrogen return",
+                "-",
+                cp.cryo_r,
+                &[lo, cp.cryo_r, hi],
+            );
+        }
+        w.values(
+            "COND_CO2_VENT",
+            "COND_CO2_VENT",
+            "Share of the condensate CO2 vented",
+            "-",
+            cp.cond_vent,
+            &[0.0, 1.0],
+        );
+        w.values(
+            "CARBON_BASELINE",
+            "CARBON_BASELINE",
+            "Central reference: 0 IEAGHG, 1 INL, 2 Cho",
+            "index",
+            0.0,
+            &[0.0, 1.0, 2.0],
+        );
+        if let Some((lo, hi)) = band("TS_SHIP_DIST_KM") {
+            w.values(
+                "TS_DISTANCE",
+                "TS_SHIP_DIST_KM",
+                "Shipping distance",
+                "km",
+                cp.ts.dist_km,
+                &[lo, cp.ts.dist_km, hi],
+            );
+        }
+        if let Some((lo, hi)) = band("TS_COND_KWH_T") {
+            w.values(
+                "TS_CONDITIONING",
+                "TS_COND_KWH_T",
+                "Conditioning electricity",
+                "kWh/t",
+                cp.ts.cond_kwh_t,
+                &[lo, cp.ts.cond_kwh_t, hi],
+            );
+        }
+    }
     w.values(
         "ETA_POWER",
         "ETA_POWER",
@@ -1293,8 +1372,8 @@ struct CostRun {
 impl CostRun {
     fn new(base: &ParamSet) -> Result<Self> {
         let m = Model::new(base)?;
-        let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-        let a = m.emissions(&b.c, m.s_b).a_atm;
+        let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+        let a = m.emissions(&b.c, m.s_b).a_net;
         Ok(Self { m, b, a })
     }
 
@@ -1499,8 +1578,8 @@ pub fn stepdown_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
 /// eq: L.31
 pub fn cofunding_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let target = m.target_mature_c;
     let cost = |method: Method, q: CostQuery| -> Result<f64> {
         Ok(match method {

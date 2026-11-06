@@ -1,12 +1,19 @@
 //! Emissions ledger. Direct emissions to atmosphere on the INL baseline, with
 //! Cho and IEAGHG bounds. System and lifecycle views stay sensitivities.
 
-use crate::anchored::{Balance, Carbon, Model};
+use crate::abatement::BaselineKind;
+use crate::anchored::{Balance, Carbon, CarbonSrc, Model};
 use nush2_props::units::{MMBTU_GJ, ST};
 use serde::Serialize;
 
 /// Annual emissions, t/y. Site is what the boundary sees, atmosphere is what
 /// reaches air.
+///
+/// `baseline` and `a_atm` are always the INL comparison: the INL unabated plant
+/// scaled to this plant, and the direct abatement against it. The headline pair
+/// of the independent basis is `baseline_central` and `a_direct`, and the cost per
+/// tonne divides by `a_net`. On the anchored carbon the three equal the INL
+/// figures and `ts_emission` is zero, so legacy results are unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Emissions {
     pub baseline: f64,
@@ -15,6 +22,22 @@ pub struct Emissions {
     pub captured: f64,
     pub a_site: f64,
     pub a_atm: f64,
+    /// Basis of the carbon lines these figures come from.
+    pub src: CarbonSrc,
+    /// Id of the central reference.
+    pub baseline_id: &'static str,
+    /// Central unabated reference, t/y.
+    pub baseline_central: f64,
+    /// Annual hydrogen, t/y.
+    pub h2_t_y: f64,
+    /// CO2 of the condensate that reaches the air, t/y (inside `atm`).
+    pub cond_vented: f64,
+    /// Transport and storage emissions, tau_TS times the captured CO2, t/y.
+    pub ts_emission: f64,
+    /// Direct abatement against the central reference (equation N.9.1).
+    pub a_direct: f64,
+    /// Net abatement after transport and storage (equation N.9.4).
+    pub a_net: f64,
 }
 
 /// Lifecycle adjustment terms, t/y.
@@ -47,13 +70,40 @@ impl Model {
         let site = self.tpy(c.burn, s);
         let atm = self.tpy(c.burn + c.exported, s);
         let captured = self.tpy(c.cap, s);
+        let h2_t_y = self.h2_a_kgh * s * c.h_scale * self.hours / 1000.0;
+        let a_atm = baseline - atm;
+        let (baseline_id, baseline_central, cond_vented, ts_emission) = match c.src {
+            CarbonSrc::Anchored => ("INL_9p21", baseline, 0.0, 0.0),
+            CarbonSrc::Plant => {
+                let kind = self.carbon_params.baseline;
+                let central = match kind {
+                    BaselineKind::Inl => baseline,
+                    other => self.baseline_kg_kg(other) * h2_t_y,
+                };
+                (
+                    kind.id(),
+                    central,
+                    self.carbon_params.cond_vent * self.tpy(c.cond, s),
+                    self.ts_parts().total() * captured,
+                )
+            }
+        };
+        let a_direct = baseline_central - atm;
         Emissions {
             baseline,
             site,
             atm,
             captured,
             a_site: baseline - site,
-            a_atm: baseline - atm,
+            a_atm,
+            src: c.src,
+            baseline_id,
+            baseline_central,
+            h2_t_y,
+            cond_vented,
+            ts_emission,
+            a_direct,
+            a_net: a_direct - ts_emission,
         }
     }
 
@@ -81,7 +131,12 @@ impl Model {
         Lifecycle {
             up_credit: (self.ng_conv * h_s - c.ng * s) * gj * self.ef_up / 1000.0,
             nuclear: r * self.eta_pwr * self.hours * self.ef_nuc / 1000.0,
-            ts_burden: self.tpy(c.cap, s) * self.ts_burden,
+            ts_burden: self.tpy(c.cap, s)
+                * if c.src == CarbonSrc::Plant {
+                    self.ts_parts().total()
+                } else {
+                    self.ts_burden
+                },
         }
     }
 

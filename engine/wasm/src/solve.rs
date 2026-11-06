@@ -311,6 +311,12 @@ pub fn resolve(inputs: Option<&Value>, p: &ParamSet) -> (Option<Resolved>, Vec<V
                         }
                     }
                     Target::HeatBasis => r.ahn = text == "ahn_2026",
+                    Target::CarbonBasis => {
+                        r.overrides.insert(
+                            "CARBON_BASIS".into(),
+                            if text == "legacy" { 0.0 } else { 1.0 },
+                        );
+                    }
                     Target::Stage => {
                         r.stage = match text {
                             "FOAK" => Stage::Foak,
@@ -459,8 +465,9 @@ pub fn live_flowsheet(inputs: &Inputs) -> std::result::Result<FlowsheetRun, Stri
     let p = inputs.base_params().map_err(|e| e.to_string())?;
     let m = Model::new(&p).map_err(|e| e.to_string())?;
     let closure = flowsheet::base_closure_cached().map_err(|e| e.to_string())?;
-    let (id, spec) = flowsheet::base_spec(&m, inputs.case, inputs.scenario, closure.h2_return)
-        .ok_or_else(|| {
+    let r = flowsheet::suite_h2_return(&m, &closure);
+    let (id, spec) =
+        flowsheet::base_spec(&m, inputs.case, inputs.scenario, r).ok_or_else(|| {
             format!(
                 "the Level 3 flowsheet covers the recycle and INL Selexol scenarios only, \
                  and the {} scenario is neither",
@@ -746,8 +753,8 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     let p = inputs.params()?;
     let m = Model::new(&p)?;
     let s = m.scale(r.case);
-    let b: Balance = m.balance(r.scn, &m.opts(s))?;
-    let k = m.case_summary(r.scn, s)?;
+    let b: Balance = m.plant_balance(r.scn, &m.opts(s))?;
+    let k = m.plant_summary(r.scn, s)?;
     let surplus_ahn = if r.ahn {
         sol.heat.margin
     } else {
@@ -837,13 +844,16 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     put("q_reboiler_mw", sol.heat.q_reb);
     put("reboiler_gap_mw", sol.heat.gap);
     put("e_aux_mwe", sol.power.e_total);
-    put("abatement_t_y", e.a_atm);
+    // The headline abatement is the net figure of the carbon basis: after
+    // transport and storage on the independent basis, and equal to the INL-baseline
+    // direct figure on the legacy basis.
+    put("abatement_t_y", e.a_net);
     put("abatement_cho_t_y", ks("A_cho"));
     put("abatement_ieaghg_t_y", ks("A_ieaghg"));
-    put("abatement_system_t_y", e.a_atm + sys);
+    put("abatement_system_t_y", e.a_net + sys);
     put(
         "abatement_lifecycle_t_y",
-        e.a_atm + lc.up_credit - lc.nuclear - lc.ts_burden,
+        e.a_direct + lc.up_credit - lc.nuclear - lc.ts_burden,
     );
     put("cost_s_per_t", cp.ac_l5);
     put("cost_l3_s_per_t", cp.ac_l3);
@@ -855,6 +865,13 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     put("target_abatement_t_y", m.target_a);
     put("target_cost_s_per_t", m.target_c);
     put("unmet_heat_mwth", sol.heat.unmet);
+    // Quantities of the carbon basis, appended after the required keys.
+    put("co2_ts_t_y", e.ts_emission);
+    put("abatement_direct_t_y", e.a_direct);
+    put("abatement_kg_per_kg", e.a_net / e.h2_t_y);
+    put("reduction", e.a_direct / e.baseline_central);
+    put("intensity_kg_kg", e.atm / e.h2_t_y);
+    put("carbon_residual_rel", b.c.closure / b.c.f);
     let kpi_class: Map<String, Value> = kpi
         .keys()
         .map(|id| (id.clone(), json!(kpi_class(id, r, base))))
@@ -886,10 +903,10 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     };
     let targets = json!({
         "abatement": {
-            "value": finite(e.a_atm),
+            "value": finite(e.a_net),
             "target": m.target_a,
-            "met": feasible && e.a_atm >= m.target_a,
-            "at_or_above_target": e.a_atm >= m.target_a,
+            "met": feasible && e.a_net >= m.target_a,
+            "at_or_above_target": e.a_net >= m.target_a,
             "feasible": feasible,
             "unit": "t/y",
         },
@@ -2065,7 +2082,7 @@ fn balances_section(
         item(
             "abatement_t_y",
             "Net abatement",
-            sol.emissions.a_atm,
+            sol.emissions.a_net,
             "t/y",
             c,
             SRC,
@@ -2079,7 +2096,11 @@ fn balances_section(
         "mass": Value::Null,
         "closure": {
             "carbon_kmol_h": finite(b.c.closure),
-            "basis": "Residual of the anchored carbon balance at INL scale",
+            "basis": if b.c.src == nush2_plant::anchored::CarbonSrc::Plant {
+                "Residual of the plant's own carbon ledger, in kmol C/h at Case A scale"
+            } else {
+                "Residual of the anchored carbon balance at INL scale"
+            },
         },
     })
 }
@@ -2122,7 +2143,7 @@ fn cost_section(
             .map(|(_, v)| *v)
             .unwrap_or(id)
     }
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let a = m.emissions(&b.c, b.s).a_net;
     let ledger: Vec<Value> = cp
         .ledger
         .lines()

@@ -4,6 +4,10 @@
 //! nush2 json --preset headline   print one plant run as JSON
 //! nush2 drift [--markdown]       print Headline against Modelled and the
 //!                                section 7 checks
+//!
+//! Every command takes `--basis legacy|independent`. The independent carbon
+//! basis is the default; `legacy` selects the ledger anchored to the INL values,
+//! which reproduces the tables of the snapshot under `engine/vv/data/legacy_results`.
 
 use nush2_numerics::{EngineError, Result};
 use nush2_plant::anchored::Model;
@@ -27,12 +31,28 @@ fn write(dir: &Path, name: &str, text: &str) -> Result<()> {
     Ok(())
 }
 
-fn export(out: &str) -> Result<()> {
+/// Registry with the carbon basis the command line names.
+fn params_for(basis: &str) -> Result<ParamSet> {
+    let mut p = ParamSet::embedded()?;
+    let v = match basis {
+        "independent" => 1.0,
+        "legacy" => 0.0,
+        other => {
+            return Err(EngineError::Parse(format!(
+                "unknown basis {other}; use legacy or independent"
+            )))
+        }
+    };
+    p.set("CARBON_BASIS", v)?;
+    Ok(p)
+}
+
+fn export(out: &str, basis: &str) -> Result<()> {
     let dir = Path::new(out);
     std::fs::create_dir_all(dir).map_err(|e| io_err(dir, e))?;
-    let p = ParamSet::embedded()?;
+    let p = params_for(basis)?;
     // Benchmarks first: the gate rows they end with decide the presets.
-    let rows = nush2_vv::harness::run_all()?;
+    let rows = nush2_vv::harness::run_all_on(&p)?;
     let pairs: Vec<(&str, &str)> = rows
         .iter()
         .map(|r| (r.test_id.as_str(), r.status.label()))
@@ -82,8 +102,10 @@ fn export(out: &str) -> Result<()> {
     Ok(())
 }
 
-fn json(preset: &str) -> Result<()> {
+fn json(preset: &str, basis: &str) -> Result<()> {
     let mut inputs = Inputs::headline();
+    let v = params_for(basis)?.get("CARBON_BASIS")?;
+    inputs.overrides.insert("CARBON_BASIS".into(), v);
     inputs.preset = match preset {
         "anchored" => Preset::Anchored,
         "headline" => Preset::Headline,
@@ -99,8 +121,8 @@ fn json(preset: &str) -> Result<()> {
     Ok(())
 }
 
-fn drift(markdown: bool) -> Result<()> {
-    let p = ParamSet::embedded()?;
+fn drift(markdown: bool, basis: &str) -> Result<()> {
+    let p = params_for(basis)?;
     let m = Model::new(&p)?;
     let fs = flowsheet::suite(&m);
     let d = drift::drift(&p, &fs, &Gates::recorded())?;
@@ -167,11 +189,21 @@ fn flag(args: &[String], name: &str, default: &str) -> String {
 
 fn dispatch(args: &[String]) -> Result<()> {
     match args.first().map(String::as_str) {
-        Some("export") => export(&flag(args, "--out", "results")),
-        Some("json") => json(&flag(args, "--preset", "headline")),
-        Some("drift") => drift(args.iter().any(|a| a == "--markdown")),
+        Some("export") => export(
+            &flag(args, "--out", "results"),
+            &flag(args, "--basis", "independent"),
+        ),
+        Some("json") => json(
+            &flag(args, "--preset", "headline"),
+            &flag(args, "--basis", "independent"),
+        ),
+        Some("drift") => drift(
+            args.iter().any(|a| a == "--markdown"),
+            &flag(args, "--basis", "independent"),
+        ),
         _ => Err(EngineError::Parse(
-            "usage: nush2 export --out DIR | json --preset NAME | drift [--markdown]".into(),
+            "usage: nush2 export --out DIR [--basis legacy|independent] | json --preset NAME              [--basis B] | drift [--markdown] [--basis B]"
+                .into(),
         )),
     }
 }

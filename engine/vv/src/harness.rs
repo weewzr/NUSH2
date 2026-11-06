@@ -17,6 +17,7 @@ use nush2_plant::export::{dcf_grid, n_tag, tables, RUNS};
 use nush2_plant::flowsheet::{self, Check};
 use nush2_plant::gates::{GateState, Rows, GATES};
 use nush2_plant::params::ParamSet;
+use nush2_props::units::kmol_h_to_t_h;
 use nush2_units::stream::Evidence;
 
 const SAME: &str = "same_dataset_disclosed";
@@ -162,7 +163,12 @@ pub fn max_carbon_residual(m: &Model) -> Result<f64> {
 /// sizing walk, cash-flow gaps and the export and registry checks. Each one
 /// verifies the port and must pass.
 pub fn plant_rows() -> Result<Vec<Row>> {
-    let p = ParamSet::embedded()?;
+    plant_rows_on(&ParamSet::embedded()?)
+}
+
+/// `plant_rows` on a registry the caller built, for the legacy basis.
+pub fn plant_rows_on(p: &ParamSet) -> Result<Vec<Row>> {
+    let p = p.clone();
     let m = Model::new(&p)?;
     let mut rows = Vec::new();
 
@@ -367,12 +373,379 @@ fn check_row(c: Check) -> Row {
 
 /// Level 3 flowsheet rows (M7), from a suite solved in this call.
 pub fn flowsheet_rows() -> Result<Vec<Row>> {
-    let m = Model::embedded()?;
+    flowsheet_rows_on(&ParamSet::embedded()?)
+}
+
+/// `flowsheet_rows` on a registry the caller built.
+pub fn flowsheet_rows_on(p: &ParamSet) -> Result<Vec<Row>> {
+    let m = Model::new(p)?;
     let s = flowsheet::suite(&m)?;
     Ok(flowsheet::checks(&m, &s)?
         .into_iter()
         .map(check_row)
         .collect())
+}
+
+/// Row of the independent carbon basis. `tol` is `Some` for a comparison with a
+/// limit and `None` for a reported value, so the legacy copies never turn into
+/// blocking checks (decision D10).
+#[allow(clippy::too_many_arguments)]
+fn ind_row(
+    id: &str,
+    subject: &str,
+    source: &str,
+    locator: &str,
+    conditions: &str,
+    literature: Option<f64>,
+    simulated: f64,
+    unit: &str,
+    tol: Option<f64>,
+    data_use: &'static str,
+    explanation: &str,
+) -> Row {
+    let abs = literature.map(|l| (simulated - l).abs());
+    let rel = literature
+        .filter(|l| *l != 0.0)
+        .map(|l| (simulated - l).abs() / l.abs());
+    let status = match (tol, abs, rel) {
+        (Some(t), Some(a), Some(r)) => Status::of(r <= t || a <= t * 1e-9),
+        (Some(t), Some(a), None) => Status::of(a <= t),
+        _ => Status::Reported,
+    };
+    Row {
+        test_id: id.to_string(),
+        level: 3,
+        subject: subject.to_string(),
+        source: source.to_string(),
+        locator: locator.to_string(),
+        conditions: conditions.to_string(),
+        literature,
+        simulated,
+        unit: unit.to_string(),
+        abs_error: abs,
+        rel_error: rel,
+        tolerance: tol,
+        status,
+        data_use,
+        explanation: explanation.to_string(),
+    }
+}
+
+fn central_row_kg_kg(ab: &nush2_plant::abatement::Abatement) -> f64 {
+    ab.rows
+        .iter()
+        .find(|r| r.id == ab.central)
+        .map_or(f64::NAN, |r| r.kg_kg_ref)
+}
+
+/// Rows that compare the independent carbon basis with the copied legacy values
+/// and with the published figures it replaces. The copied values stay in the
+/// engine (legacy basis) and every comparison here is reported or tested against
+/// its own tolerance, never against a limit that was widened to pass (decision
+/// D10). Empty on the legacy basis.
+pub fn independent_rows_on(p: &ParamSet) -> Result<Vec<Row>> {
+    let m = Model::new(p)?;
+    if !m.carbon_params.independent() {
+        return Ok(Vec::new());
+    }
+    let s = m.s_b;
+    let legacy_b = m.balance(Scenario::RecF, &m.opts(s))?;
+    let legacy = m.emissions(&legacy_b.c, s);
+    let b = m.plant_balance(Scenario::RecF, &m.opts(s))?;
+    let ab = m.abatement(&b, s)?;
+    let e = m.emissions(&b.c, s);
+    let cond = "FS ledger run at the Case A hydrogen, scaled to Case B; MEA, 90 % per pass";
+    let src = "Independent carbon basis, docs/derivation/01_carbon_and_abatement.md";
+    let legacy_note =
+        "The legacy value rests on INL Case 5 and Case 6 numbers; the independent value \
+                       comes from the plant's own stream ledger with the cryogenic recovery and \
+                       hydrogen return as design inputs. Reported only, no limit (decision D10)";
+    let central = ab
+        .rows
+        .iter()
+        .find(|r| r.id == ab.central)
+        .map(|r| (r.a_net, r.a_direct))
+        .unwrap_or((f64::NAN, f64::NAN));
+    let inl_row = ab.rows.iter().find(|r| r.id == "INL_9p21");
+    let mut rows = vec![
+        ind_row(
+            "IND_ABATEMENT_NET_VS_LEGACY",
+            "Net abatement, central reference, against the copied INL-anchored value",
+            src,
+            "equations N.9.1 and N.9.4; card K.11",
+            cond,
+            Some(legacy.a_atm),
+            central.0,
+            "t/y",
+            None,
+            SAME,
+            legacy_note,
+        ),
+        ind_row(
+            "IND_ABATEMENT_DIRECT_INL_VS_LEGACY",
+            "Direct abatement on the INL reference, independent against legacy",
+            src,
+            "equation N.9.1; card K.11",
+            cond,
+            Some(legacy.a_atm),
+            inl_row.map_or(f64::NAN, |r| r.a_direct),
+            "t/y",
+            None,
+            SAME,
+            legacy_note,
+        ),
+        ind_row(
+            "IND_DRIFT_BAND_578000",
+            "Independent net abatement against the 578,000 t/y band of the drift check",
+            src,
+            "engine/plant/src/drift.rs",
+            cond,
+            Some(578_000.0),
+            central.0,
+            "t/y",
+            None,
+            SAME,
+            "The blocking drift check keeps its 578,000 plus or minus 12,000 t/y band on the legacy \
+             basis. On the independent basis the same comparison is a reported row",
+        ),
+        ind_row(
+            "IND_CAPTURED_VS_LEGACY",
+            "Captured CO2 against the anchored ledger",
+            src,
+            "equations N.3.1 and N.9.3; card K.7",
+            cond,
+            Some(legacy.captured),
+            e.captured,
+            "t/y",
+            None,
+            SAME,
+            legacy_note,
+        ),
+        ind_row(
+            "IND_RESIDUAL_VS_LEGACY",
+            "Direct emission of the plant against the anchored ledger",
+            src,
+            "equation N.5.2; card K.8",
+            cond,
+            Some(legacy.atm),
+            e.atm,
+            "t/y",
+            None,
+            SAME,
+            "The independent value holds the stack and the vented condensate CO2; the legacy ledger \
+             holds the stack only",
+        ),
+    ];
+    if let Some(d) = ab.decomposition {
+        let inl_ref = m.ng_conv * s;
+        rows.push(ind_row(
+            "IND_REF_GAS_IMPLIED_VS_INL",
+            "Reference gas implied by the central intensity against INL's 52.5 MMSCFD scaled",
+            src,
+            "equation N.7.3 and rule 1 of the boundary table",
+            cond,
+            Some(inl_ref),
+            d.n_ref_mmscfd,
+            "MMSCFD",
+            None,
+            SAME,
+            "The GAS line of the cost ledger keeps INL's reference gas; this row prints the gap to \
+             the gas that the central intensity implies",
+        ));
+        if let Some(floor_gas) = ab.floor_gas_mmscfd {
+            rows.push(ind_row(
+                "IND_REF_GAS_FLOOR_VS_INL_HTGR",
+                "Process gas of the plant-built unabated reference against INL's 44.5 MMSCFD scaled",
+                src,
+                "equation N.7.1 at its floor",
+                "Reference flowsheet run: no capture, no cryogenic unit, no firing gas",
+                Some(m.ng_norec * s),
+                floor_gas,
+                "MMSCFD",
+                None,
+                SAME,
+                "INL's nuclear-heated plant without capture burns no firing gas, so its gas is the \
+                 process gas that the reference run computes",
+            ));
+        }
+    }
+    // The floors of the unabated reference against the published intensities
+    // (equations N.7.1 and N.10, cards K.5 and K.6).
+    if let Some(floor) = ab.rows.iter().find(|r| r.id == "PLANT_FLOOR") {
+        rows.push(ind_row(
+            "IND_FLOOR_VS_IEAGHG",
+            "Plant-built reference without firing gas against the IEAGHG intensity",
+            src,
+            "equations N.7.1 and N.7.3",
+            "Reference flowsheet run: no capture, no cryogenic unit, no firing gas",
+            Some(m.base_ieaghg),
+            floor.kg_kg_ref,
+            "kg/kg",
+            None,
+            "independent",
+            "A floor: the furnace of a real reference burns extra gas. The published intensity              sits above it, as it must",
+        ));
+    }
+    let chem = nush2_props::units::MW_CO2 / (4.0 * nush2_props::units::MW_H2);
+    rows.push(ind_row(
+        "IND_CHEMISTRY_FLOOR_K5",
+        "Central reference intensity against the stoichiometric floor of methane reforming",
+        src,
+        "card K.5",
+        "M_CO2 / (4 M_H2)",
+        Some(chem),
+        central_row_kg_kg(&ab),
+        "kg/kg",
+        None,
+        "independent",
+        "Any steam methane reforming route that makes hydrogen from methane emits at least the          floor; the central intensity must sit above it",
+    ));
+    // Carbon identity of equation N.7.3 on INL's two published gas flows.
+    let k = nush2_props::units::st_d_to_kmol_h(1.0);
+    for (id, gas, target, locator) in [
+        (
+            "IND_N73_INL_UNABATED",
+            m.ng_conv,
+            m.co2_conv,
+            "52.5 MMSCFD and 3205 st/d",
+        ),
+        (
+            "IND_N73_INL_HTGR_NOCC",
+            m.ng_norec,
+            m.co2_htgr_nocc,
+            "44.5 MMSCFD and 2713 st/d",
+        ),
+    ] {
+        let kmol_c = nush2_props::units::mmscfd_to_kmol_h(gas)
+            * nush2_plant::flowsheet::ng_carbon_per_mol()
+            - m.p_c;
+        rows.push(ind_row(
+            id,
+            "Carbon identity of the unabated reference on INL's published gas flow",
+            "INL TEV-953 Table 2",
+            locator,
+            "Case A, no condensate term, product methane 6.474 kmol C/h",
+            Some(target),
+            kmol_c / k,
+            "st/d",
+            Some(0.005),
+            SAME,
+            "Equation N.7.3 with the gas as published; passes when the carbon identity reproduces \
+             the published CO2 within 0.5 percent",
+        ));
+    }
+    // Cryogenic design inputs: read back, and against the calculation they were set from.
+    let rec = m.plant_ledger(nush2_plant::abatement::LedgerKind::Rec, m.eta_mea)?;
+    let l = rec.lines();
+    let f_read = nush2_plant::abatement::closed_form::recycle_read_back(l.tube, l.feed, l.tail_gas);
+    rows.push(ind_row(
+        "IND_CRYO_F_READBACK",
+        "Recycle fraction read back from the plant's streams against the design input",
+        src,
+        "equation N.4.1",
+        cond,
+        Some(m.carbon_params.cryo_f),
+        f_read,
+        "-",
+        Some(1e-9),
+        "independent",
+        "f = (T - F_C) / G from S04, S01 and S14 against CRYO_C_RECOVERY",
+    ));
+    let f_j7 = nush2_plant::flowsheet::recycle_fraction(&m);
+    rows.push(ind_row(
+        "IND_CRYO_F_VS_J7",
+        "Cryogenic carbon recovery input against the INL back-calculation",
+        "INL Case 6, TEV-953",
+        "card J.7; equation N.4.3",
+        "1927 st/d, Selexol 99 %, carbon split 0.775",
+        Some(f_j7),
+        m.carbon_params.cryo_f,
+        "-",
+        Some(1e-9),
+        SAME,
+        "The registry input equals the J.7 value to twelve digits, so it carries INL information \
+         (decision D8); the derivative of N.4.3 shows how fragile that value is",
+    ));
+    let cl = nush2_plant::flowsheet::close_h2_return(&m)?;
+    rows.push(ind_row(
+        "IND_CRYO_R_VS_CLOSURE",
+        "Cryogenic hydrogen return input against the closure on INL's gas and hydrogen pair",
+        "INL Case 6, TEV-953",
+        "equation N.1.4; flowsheet close_h2_return",
+        "34.0 MMSCFD of gas, 29,000 lb/h of hydrogen at Case A",
+        Some(cl.h2_return),
+        m.carbon_params.cryo_r,
+        "-",
+        Some(1e-9),
+        SAME,
+        "The registry input equals the closure value to twelve digits (decision D8)",
+    ));
+    rows.push(ind_row(
+        "IND_CARBON_CLOSURE_REL",
+        "Relative carbon residual of the plant's ledger",
+        src,
+        "equations N.6.1 and N.10.4",
+        cond,
+        Some(0.0),
+        ab.closure.relative_modelled.unwrap_or(f64::NAN).abs(),
+        "-",
+        Some(m.carbon_params.closure_tol),
+        "independent",
+        &format!(
+            "Verdict on the modelled streams: {}. Whole account: {}, because the streams {} are not \
+             modelled and are never entered as zero",
+            ab.closure.on_modelled.label(),
+            ab.closure.overall.label(),
+            ab.closure.unknown.join(", ")
+        ),
+    ));
+    // Transport and storage: the physical sum against the flat ratio and the
+    // published whole-chain figures.
+    let tau = ab.tau_ts;
+    rows.push(ind_row(
+        "IND_TS_VS_FLAT_RATIO",
+        "Transport and storage emissions per tonne against the flat ratio of the legacy ledger",
+        src,
+        "equation N.9.4; parameter TS_BURDEN",
+        "1000 km by ship, grid electricity",
+        Some(m.ts_burden),
+        tau,
+        "t/t",
+        None,
+        "independent",
+        "The flat ratio has no verified source and stays as a cross-check",
+    ));
+    rows.push(ind_row(
+        "IND_TS_VS_NORTHERN_LIGHTS",
+        "Transport and storage emissions per tonne against the Northern Lights footprint",
+        "Gentile et al., Northern Lights carbon footprint, 2023",
+        "Abstract",
+        "Whole chain in CO2e over the project life, including construction",
+        Some(0.026),
+        tau,
+        "t/t",
+        None,
+        "independent",
+        "Different boundaries: the published figure is a lifecycle result in CO2e that includes \
+         construction, this row is operating CO2 at the stated distance",
+    ));
+    // Heat of the reboiler on the plant's captured CO2 against the anchored one.
+    let q_plant = kmol_h_to_t_h(b.c.cap) * m.srd.central / nush2_props::units::GJ_PER_MWH * s;
+    rows.push(ind_row(
+        "IND_REBOILER_RECONCILIATION",
+        "Reboiler duty on the plant's captured CO2 against the duty in the heat balance",
+        src,
+        "equation N.3.1; card J.16",
+        cond,
+        Some(legacy_b.q_reb),
+        q_plant,
+        "MW",
+        None,
+        "independent",
+        "The heat and power balance keeps the anchored captured CO2; this row prints the duty \
+         that the plant's own capture would imply",
+    ));
+    Ok(rows)
 }
 
 /// Literature benchmarks that run in seconds: the M2 property rows, the matrix
@@ -496,10 +869,21 @@ pub fn gate_rows(rows: &[Row], column_gate: Option<Evidence>) -> Result<Vec<Row>
 /// Everything: the whole of `Validation_Results.csv`. A flowsheet that does not
 /// solve leaves its rows out and says so on stderr, as the exporter did before.
 pub fn run_all() -> Result<Vec<Row>> {
-    let mut rows = plant_rows()?;
-    match flowsheet_rows() {
+    run_all_on(&ParamSet::embedded()?)
+}
+
+/// `run_all` on a registry the caller built. The independent carbon rows are
+/// added only when the registry selects the independent basis, so the legacy
+/// basis writes the rows of the snapshot and no others.
+pub fn run_all_on(p: &ParamSet) -> Result<Vec<Row>> {
+    let mut rows = plant_rows_on(p)?;
+    match flowsheet_rows_on(p) {
         Ok(fs) => rows.extend(fs),
         Err(e) => eprintln!("flowsheet rows not written, the flowsheet did not solve: {e}"),
+    }
+    match independent_rows_on(p) {
+        Ok(ind) => rows.extend(ind),
+        Err(e) => eprintln!("independent carbon rows not written: {e}"),
     }
     rows.extend(literature_rows()?);
     let (units, column_gate) = unit_rows_with_gate(true)?;

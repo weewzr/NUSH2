@@ -2910,3 +2910,199 @@ source = "IEAGHG 2017-02 Case 1A, aMDEA on shifted syngas, about 3.03 GJ/t from 
 locator = "PDF p68, p75 to p76"
 source_status = "via_reader"
 decision = "D25"
+
+[[param]]
+id = "CARBON_BASIS"
+value = 1.0
+unit = "flag"
+group = "carbon"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Carbon basis of every abatement figure, project decisions D1 and D12 in docs/ABATEMENT_SUBSIDY_LOG.md: 1 computes captured and emitted CO2 from the plant's own stream ledger, 0 selects the legacy ledger anchored to the INL Case 5 and Case 6 values. The command line flag --basis sets it"
+locator = "decisions D1 and D12"
+source_status = "primary"
+name = "Carbon basis"
+
+[[param]]
+id = "CARBON_BASELINE"
+value = 0.0
+unit = "flag"
+group = "carbon"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Central unabated reference of the independent basis, project decision D2 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 is the IEAGHG 2017-02 Case 1 intensity, 1 the INL intensity, 2 the Cho fleet average. The other two stay in the tables as comparison rows"
+locator = "decision D2"
+source_status = "primary"
+name = "Central unabated reference"
+
+[[param]]
+id = "CRYO_C_RECOVERY"
+value = 0.752178065489
+unit = "-"
+low = 0.729852
+high = 0.771783
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the PSA reject carbon that the cryogenic unit returns to the reformer. The unit is not simulated, so the atom balances cannot fix this share and it is a design input (project decision D8 in docs/ABATEMENT_SUBSIDY_LOG.md). The central value is the share that INL Case 6 implies through card J.7 (1927 st/d, Selexol 99%, carbon split 0.775), so it carries INL information. The band is the same calculation at the carbon split bounds 0.79 and 0.76"
+locator = "decision D8; equation N.4.1 of docs/derivation/01_carbon_and_abatement.md"
+source_status = "primary"
+name = "Cryogenic carbon recovery"
+
+[[param]]
+id = "CRYO_H2_RETURN"
+value = 0.921629763840
+unit = "-"
+low = 0.871630
+high = 0.971630
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the PSA reject hydrogen that the cryogenic unit returns ahead of the PSA, a design input (project decision D8 in docs/ABATEMENT_SUBSIDY_LOG.md). The central value is the closure that makes INL's 34.0 MMSCFD of gas give INL's 29,000 lb/h of hydrogen at Case A, so it carries INL information. The band of plus and minus 0.05 has no source and only marks the scale of the sensitivity"
+locator = "decision D8; equation N.1.4 of docs/derivation/01_carbon_and_abatement.md"
+source_status = "primary"
+name = "Cryogenic hydrogen return"
+
+[[param]]
+id = "COND_CO2_VENT"
+value = 1.0
+unit = "-"
+low = 0.0
+high = 1.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the CO2 dissolved in the process condensate that reaches the atmosphere. The plant model does not follow the condensate, and an unknown fate must not count as zero emission, so the central value is 1 (equation N.5.2 of docs/derivation/01_carbon_and_abatement.md). The same share applies to the unabated reference"
+locator = "equation N.5.2"
+source_status = "primary"
+name = "Condensate CO2 vented"
+
+[[param]]
+id = "CARBON_CLOSURE_TOL"
+value = 1.0e-9
+unit = "-"
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Tolerance of the relative carbon closure residual, equal to the element tolerance of the flowsheet. A good converged run sits more than two orders below it and the smallest modelled stream sits six orders above it (equation N.6.1 of docs/derivation/01_carbon_and_abatement.md)"
+locator = "equation N.6.1"
+source_status = "primary"
+name = "Carbon closure tolerance"
+
+[[param]]
+id = "TS_SHIP_G_T_KM"
+value = 6.77
+unit = "g fuel/t/km"
+low = 3.21
+high = 7.07
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Ship fuel per tonne of CO2 and kilometre for a 10 kt ship (3.21 for 100 kt, 7.07 for 2.5 kt), Roussanaly et al., Energies 14(18):5635, 2021. Round trip basis inferred from agreement with Element Energy 2018"
+locator = "Table 4, PDF p9"
+source_status = "via_reader"
+name = "Ship fuel per tonne and kilometre"
+
+[[param]]
+id = "TS_SHIP_FUEL_MWH_T"
+value = 11.63
+unit = "MWh/t"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Energy content of marine diesel, Element Energy for BEIS, Shipping CO2 UK cost estimation study, 2018"
+locator = "Table 4-7, PDF p29"
+source_status = "via_reader"
+name = "Marine diesel energy content"
+
+[[param]]
+id = "TS_SHIP_FUEL_EF"
+value = 74.1
+unit = "t CO2/TJ"
+low = 74.1
+high = 77.4
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "CO2 per energy of gas or diesel oil, IPCC 2006 Guidelines Vol. 2 Ch. 3 (77.4 for residual fuel oil)"
+locator = "Table 3.5.2"
+source_status = "primary"
+name = "Ship fuel CO2 factor"
+
+[[param]]
+id = "TS_SHIP_DIST_KM"
+value = 1000.0
+unit = "km"
+low = 200.0
+high = 2000.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "One-way shipping distance to the store. The repository states no route, so this is a labelled modelling assumption; the cited cost study evaluates 200 km and 1000 km (Element Energy for BEIS, 2018) and the band widens that range"
+locator = "modelling assumption"
+source_status = "not_verified"
+name = "Shipping distance"
+
+[[param]]
+id = "TS_COND_KWH_T"
+value = 19.6
+unit = "kWh/t"
+low = 9.0
+high = 83.1
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Liquefaction and conditioning electricity for CO2 delivered pre-pressurised (the plant's S20 leaves at 2015 psia), medium-pressure ship, Element Energy for BEIS, 2018. The choice of that row is the assumption. Low is the 90 bara feed of Roussanaly et al. 2021 Table 3, high the non-pressurised feed of the same study"
+locator = "Table 4-2, PDF p26"
+source_status = "via_reader"
+name = "CO2 conditioning electricity"
+
+[[param]]
+id = "TS_INJ_KWH_T"
+value = 5.0
+unit = "kWh/t"
+low = 4.0
+high = 5.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Offshore pumping from 6.5 to 150 bar, IEAGHG Technical Report 2020-10. The top of the printed 4 to 5 kWh/t range is taken so that the abatement is not overstated"
+locator = "conditioning section, PDF p59"
+source_status = "via_reader"
+name = "Injection pumping electricity"
+
+[[param]]
+id = "TS_TERMINAL_FRAC"
+value = 0.00048
+unit = "t/t"
+group = "carbon"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "Terminal and injection operating emissions of the Northern Lights design, 720 t CO2/y over 1.5 Mt/y (Equinor for Gassnova, 2019); a preliminary estimate"
+locator = "PDF p18"
+source_status = "via_reader"
+name = "Terminal operating emissions"
+
+[[param]]
+id = "TS_PURGE_FRAC"
+value = 0.0009
+unit = "t/t"
+group = "carbon"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "Upper bound for purge, cool-down and methane slip derived from the Northern Lights carbon footprint report (Gentile et al., 2023): 4 percent of 0.026 t CO2e per t stored"
+locator = "Results text, Figs 3 to 6"
+source_status = "via_reader"
+name = "Purge and cool-down emissions"
+
+[[param]]
+id = "TS_GRID_EF"
+value = 0.4080
+unit = "t CO2/MWh"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Singapore grid emission factor for 2020, Energy Market Authority via data.gov.sg (dataset updated 6 Jun 2024). The legacy GRID_EF is left unchanged"
+locator = "datastore rows 2005 to 2020"
+source_status = "primary"
+name = "Grid emission factor of the T&S electricity"

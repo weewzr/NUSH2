@@ -6,6 +6,7 @@
 //! sequence (freed Selexol steam, export steam, syngas above 130 C, reactor
 //! steam), and no default size exponent exists, so every cost call states `n`.
 
+use crate::abatement::CarbonParams;
 use crate::heatrec;
 use crate::params::{ParamSet, Reader};
 use crate::subsidy::SubsidyParams;
@@ -320,6 +321,8 @@ pub struct Model {
     pub scale_t08: f64,
     /// Inputs of the co-funding model (`crate::subsidy`).
     pub subsidy: SubsidyParams,
+    /// Inputs of the independent carbon basis (`crate::abatement`).
+    pub carbon_params: CarbonParams,
 }
 
 /// Inputs of the independent WGS-EX4 cooling curve check.
@@ -338,10 +341,25 @@ pub struct Ex4Check {
     pub ant_bar: f64,
 }
 
+/// Where the numbers of a carbon balance come from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum CarbonSrc {
+    /// The ledger anchored to the INL Case 5 and Case 6 values (cards J.6 to J.11).
+    Anchored,
+    /// The plant's own stream ledger from the Level 3 flowsheet (equations N.2
+    /// and N.3 of the independent derivation).
+    Plant,
+}
+
 /// Carbon balance at Case A in kmol C/h.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Carbon {
     pub scn: Scenario,
+    /// Which basis these numbers belong to.
+    pub src: CarbonSrc,
+    /// CO2 dissolved in the process condensate (S10), kmol C/h. The anchored
+    /// ledger has no such line and carries zero.
+    pub cond: f64,
     pub ng: f64,
     pub h2: f64,
     pub h_scale: f64,
@@ -880,6 +898,7 @@ impl Model {
             scale_t07: r.term_scale("T07"),
             scale_t08: r.term_scale("T08"),
             subsidy: SubsidyParams::read(r)?,
+            carbon_params: CarbonParams::read(r)?,
         })
     }
 
@@ -942,6 +961,8 @@ impl Model {
         let f6 = (t6 - self.f_c6) / g6;
         let mut c = Carbon {
             scn,
+            src: CarbonSrc::Anchored,
+            cond: 0.0,
             ng: self.ng_c6,
             h2: self.h2_a_mmscfd,
             h_scale: 1.0,
@@ -1375,6 +1396,15 @@ impl Model {
         self.ng_c6 * s
     }
 
+    /// Fresh natural gas of a carbon balance at scale `s`, MMSCFD: the plant's
+    /// own gas rate when the lines come from its ledger, `ng_mmscfd` otherwise.
+    pub fn ng_mmscfd_of(&self, c: &Carbon, s: f64) -> f64 {
+        match c.src {
+            CarbonSrc::Plant => c.ng * s,
+            CarbonSrc::Anchored => self.ng_mmscfd(s),
+        }
+    }
+
     /// Antoine saturation pressure in bar, valid from 99 to 374 C.
     pub fn psat_bar(&self, tc: f64) -> f64 {
         10f64.powf(self.ex4.ant_a - self.ex4.ant_b / (self.ex4.ant_c + tc)) * self.ex4.ant_bar
@@ -1409,9 +1439,23 @@ impl Model {
     /// eq: K.12
     /// eq: K.13
     pub fn case_summary(&self, scn: Scenario, s: f64) -> Result<BTreeMap<&'static str, f64>> {
+        let b = self.balance(scn, &self.opts(s))?;
+        self.case_summary_from(scn, s, &b)
+    }
+
+    /// `case_summary` on a balance the caller built: the anchored one, or the
+    /// plant's from `plant_balance`. The carbon lines and the gas rate follow the
+    /// basis the balance carries.
+    pub fn case_summary_from(
+        &self,
+        scn: Scenario,
+        s: f64,
+        b: &Balance,
+    ) -> Result<BTreeMap<&'static str, f64>> {
         let o = self.opts(s);
-        let b = self.balance(scn, &o)?;
         let c = b.c;
+        let plant = c.src == CarbonSrc::Plant;
+        let ng_plant = if plant { c.ng } else { self.ng_c6 };
         let e = self.emissions(&c, s);
         let h2_kgh = self.h2_a_kgh * s;
         let h2_t_y = h2_kgh * self.hours / 1000.0;
@@ -1423,19 +1467,19 @@ impl Model {
         k.insert("h2_nm3_h", h2_kgh / self.rho_h2n);
         k.insert("hours", self.hours);
         k.insert("days", self.days);
-        k.insert("ng_mmscfd", self.ng_mmscfd(s));
+        k.insert("ng_mmscfd", ng_plant * s);
         k.insert("ng_unabated_mmscfd", self.ng_conv * s);
         k.insert("ng_norecycle_mmscfd", self.ng_norec * s);
-        k.insert("ng_saved_mmscfd", (self.ng_conv - self.ng_c6) * s);
+        k.insert("ng_saved_mmscfd", (self.ng_conv - ng_plant) * s);
         k.insert(
             "ng_gj_d_saved",
-            (self.ng_conv - self.ng_c6) * s * gj_per_mmscf,
+            (self.ng_conv - ng_plant) * s * gj_per_mmscf,
         );
         k.insert(
             "gas_saving_SM_y",
-            (self.ng_conv - self.ng_c6) * s * gj_per_mmscf * self.days * self.gas.central / 1e6,
+            (self.ng_conv - ng_plant) * s * gj_per_mmscf * self.days * self.gas.central / 1e6,
         );
-        k.insert("feed_C_kmol_h", self.f_c6 * s);
+        k.insert("feed_C_kmol_h", if plant { c.f * s } else { self.f_c6 * s });
         k.insert("tube_C_kmol_h", c.t * s);
         k.insert("co2_abs_kmol_h", c.co2_abs * s);
         k.insert("cap_kmol_h", c.cap * s);

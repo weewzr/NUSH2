@@ -471,7 +471,12 @@ fn default_solve_matches_the_published_results() {
     let line = |view: &str| {
         csv_value(
             em,
-            &[(0, "B_REC_F"), (1, "INL_9p21"), (2, view), (3, "ABATEMENT")],
+            &[
+                (0, "B_REC_F"),
+                (1, "IEAGHG_9p00"),
+                (2, view),
+                (3, "ABATEMENT"),
+            ],
             5,
         )
     };
@@ -1057,7 +1062,7 @@ fn every_pfd_unit_has_status_and_sections() {
 /// Final_Design_Basis.csv equals that cell. The KPIs without one are listed.
 #[test]
 fn case_a_kpis_match_the_case_a_mea_cells() {
-    const MAP: [(&str, &str); 21] = [
+    const MAP: [(&str, &str); 26] = [
         ("rating_mwth", "REACTOR_RATED_MWTH"),
         ("reactor_required_mwth", "RES_REACTOR_NEEDED_MWTH"),
         ("surplus_mwth", "RES_MARGIN_210_MWTH"),
@@ -1079,10 +1084,16 @@ fn case_a_kpis_match_the_case_a_mea_cells() {
         ("solvent_t_h", "RES_SOLVENT_T_H"),
         ("target_abatement_t_y", "TARGET_ABATEMENT"),
         ("target_cost_s_per_t", "TARGET_COST"),
+        ("co2_ts_t_y", "RES_TS_EMISSION_T_Y"),
+        ("abatement_direct_t_y", "RES_ABATEMENT_DIRECT_T_Y"),
+        ("abatement_kg_per_kg", "RES_ABATEMENT_PER_KG"),
+        ("reduction", "RES_REDUCTION"),
+        ("intensity_kg_kg", "RES_INTENSITY_KG_KG"),
     ];
     // KPIs with no case_a_mea cell: their rows in the results are Case B only,
     // or they live in another file.
-    const NO_CELL: [&str; 11] = [
+    const NO_CELL: [&str; 12] = [
+        "carbon_residual_rel",
         "surplus_ahn_mwth",
         "unmet_heat_mwth",
         "h2_rich_kmol_h",
@@ -1240,6 +1251,12 @@ fn no_control_moves_the_h2_return_closure() {
         else {
             continue;
         };
+        // The two cryogenic design inputs are inputs of the closure run itself on
+        // the independent basis, where the live flowsheet runs the input and not
+        // the closure value.
+        if id == "CRYO_C_RECOVERY" || id == "CRYO_H2_RETURN" {
+            continue;
+        }
         for end in ["model_min", "model_max"] {
             sets.push(vec![(id.to_string(), rec[end].as_f64().unwrap() * scale)]);
         }
