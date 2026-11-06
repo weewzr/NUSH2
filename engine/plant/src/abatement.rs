@@ -818,6 +818,42 @@ impl Model {
         Ok(k)
     }
 
+    /// Carbon of all the gas that the unabated reference plant takes in to make
+    /// this plant's hydrogen, kmol C/h in the units of the `Carbon` lines of the
+    /// balance (per unit of the case scale). The reference emission is
+    /// `k (cbar n_ref - P - (1 - v) K')` (N.7.3), so the carbon follows from the
+    /// central intensity: `E_ref / k + P + (1 - v) K'`, with the product carbon
+    /// `P` of the plant and the condensate CO2 `K'` of the reference run.
+    ///
+    /// eq: N.7.3
+    pub fn reference_carbon(&self, c: &Carbon, s: f64) -> Result<f64> {
+        let e = self.emissions(c, s);
+        let rf = self.reference_ledger()?;
+        let k = self.tpy(1.0, s);
+        let v = self.carbon_params.cond_vent;
+        let k_ref = rf.lines().condensate * c.h_scale;
+        Ok(e.baseline_central / k + c.p + (1.0 - v) * k_ref)
+    }
+
+    /// Natural gas of the unabated reference plant at this plant's hydrogen
+    /// output, MMSCFD. This is the one number behind the GAS line of the cost
+    /// ledger, the saved upstream gas of the lifecycle view and the avoided-gas
+    /// term of the decomposition (rule 1 of the boundary table of N.7). On the
+    /// independent basis it is the gas that the central intensity implies; on the
+    /// anchored basis it is the INL conventional-plant gas scaled to the plant.
+    ///
+    /// eq: N.7.3
+    /// eq: N.9.2
+    pub fn reference_gas_mmscfd(&self, c: &Carbon, s: f64) -> Result<f64> {
+        if c.src != CarbonSrc::Plant {
+            let h_s = s * c.h_scale;
+            return Ok(self.ng_conv * h_s);
+        }
+        let cbar = ng_carbon_per_mol();
+        let mmscfd_per_kmol_h = 1.0 / mmscfd_to_kmol_h(1.0);
+        Ok(self.reference_carbon(c, s)? / cbar * mmscfd_per_kmol_h * s)
+    }
+
     /// Annual quantities of the balance: captured, stack and condensate CO2,
     /// transport and storage emissions, direct and net abatement against each
     /// reference, intensities and the closure report.
@@ -888,13 +924,9 @@ impl Model {
             floor_gas = Some(rf.ng_mmscfd() * hs * s);
             // Decomposition against the central reference (N.9.2): the reference
             // carbon is E_ref / k + P + (1 - v) K', and the gas it implies follows.
-            let central = rows
-                .iter()
-                .find(|r| r.id == self.carbon_params.baseline.id())
-                .map(|r| r.e_ref_t_y)
-                .unwrap_or(e.baseline);
+            // The same two functions give the gas of the GAS line of the ledger.
             let k_ref = l.condensate * hs;
-            let ref_carbon = central / k + c.p + (1.0 - v) * k_ref;
+            let ref_carbon = self.reference_carbon(c, s)?;
             let captured = k * c.cap;
             let avoided_gas = k * (ref_carbon - c.f);
             let condensate = -(1.0 - v) * k * (k_ref - c.cond);
@@ -903,7 +935,7 @@ impl Model {
                 avoided_gas,
                 condensate,
                 total: captured + avoided_gas + condensate,
-                n_ref_mmscfd: ref_carbon / cbar * mmscfd_per_kmol_h * s,
+                n_ref_mmscfd: self.reference_gas_mmscfd(c, s)?,
                 n_plant_mmscfd: c.f / cbar * mmscfd_per_kmol_h * s,
             });
         }

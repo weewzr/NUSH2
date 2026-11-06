@@ -574,8 +574,11 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
     drift_block(p, rec, &mut rows)?;
     rows.sort_by(|a, b| a.id.cmp(&b.id));
     for r in rows {
-        let plant_row =
-            r.group == "carbon" || matches!(r.id.as_str(), "RES_NG_MMSCFD" | "RES_SOLVENT_T_H");
+        let plant_row = r.group == "carbon"
+            || matches!(
+                r.id.as_str(),
+                "RES_NG_MMSCFD" | "RES_NG_UNABATED_MMSCFD" | "RES_SOLVENT_T_H"
+            );
         let status = if m.carbon_params.independent() && plant_row {
             CARBON_STATUS.to_string()
         } else {
@@ -899,6 +902,8 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
                 "Unabated reference, central: {} times the annual hydrogen",
                 m.carbon_params.baseline.id()
             )
+        } else if m.carbon_params.independent() && id == "RES_NG_UNABATED_MMSCFD" {
+            "Natural gas of the unabated reference plant, implied by the central intensity".into()
         } else if id == "RES_ABATEMENT_IEAGHG_T_Y" {
             format!(
                 "Abatement on the IEAGHG bound of {:.6} kg/kg, unrounded: 0.8091 kg CO2/Nm3 over \
@@ -1036,7 +1041,11 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
     let ng_u = get("ng_unabated_mmscfd");
     rows.push(one(
         "RES_GAS_SAVING_INL",
-        "Gas saved against the unabated SMR on the INL pair".into(),
+        if m.carbon_params.independent() {
+            "Gas saved against the unabated reference implied by the central intensity".into()
+        } else {
+            "Gas saved against the unabated SMR on the INL pair".into()
+        },
         1.0 - ng_b / ng_u,
         "-",
         "L.16",
@@ -3104,10 +3113,42 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
         CarbonSrc::Anchored => e.captured / (e.captured + e.atm),
     };
     let sys = m.system_adjust(&b, s);
-    let lc = m.lifecycle_terms(&b, s, b.r);
+    let lc = m.lifecycle_terms(&b, s, b.r)?;
     let abatement_name = match src {
         CarbonSrc::Plant => "Direct abatement",
         CarbonSrc::Anchored => "Net abatement",
+    };
+    // The lifecycle views add CO2e terms (the upstream gas factor and the nuclear
+    // factor) to CO2 lines. On the independent basis every row of these views
+    // says so, with the horizon and the source of each CO2e term (decision D4).
+    // The legacy rows keep the wording of the committed tables.
+    let (nuc_name, ts_name, burden_total, up_name, up_total, lc_source) = match src {
+        CarbonSrc::Plant => (
+            "Nuclear lifecycle burden, CO2e (UNECE 2021 range through a secondary summary, warming-potential horizon not stated)"
+                .to_string(),
+            "T&S burden, CO2".to_string(),
+            "Net abatement with the nuclear lifecycle burden, CO2e total".to_string(),
+            format!(
+                "Saved upstream gas, CO2e (GWP100 = {}, IEA 2026, global gas supply mix)",
+                m.gwp_up
+            ),
+            format!(
+                "Net abatement with saved upstream gas and the nuclear lifecycle burden, CO2e total (GWP100 = {} for the upstream term)",
+                m.gwp_up
+            ),
+            format!(
+                "{}; CO2e terms: upstream gas factor EF_UPSTREAM (IEA 2026, GWP100 = {}) and nuclear factor EF_NUCLEAR (UNECE 2021 range, horizon not stated)",
+                source, m.gwp_up
+            ),
+        ),
+        CarbonSrc::Anchored => (
+            "Nuclear lifecycle burden".to_string(),
+            "T&S burden".to_string(),
+            "Net abatement".to_string(),
+            "Saved upstream gas".to_string(),
+            "Net abatement".to_string(),
+            source.to_string(),
+        ),
     };
     for (bid, base) in [
         ("CHO_9p35", m.base_cho * h2),
@@ -3129,17 +3170,12 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
             (
                 "lifecycle_burdens",
                 vec![
-                    (
-                        "NUCLEAR_LC",
-                        "Nuclear lifecycle burden",
-                        -lc.nuclear,
-                        "K.19",
-                    ),
-                    ("TS_BURDEN", "T&S burden", -lc.ts_burden, "K.19"),
+                    ("NUCLEAR_LC", nuc_name.as_str(), -lc.nuclear_co2e, "K.19"),
+                    ("TS_BURDEN", ts_name.as_str(), -lc.ts_burden, "K.19"),
                     (
                         "ABATEMENT",
-                        "Net abatement",
-                        a - lc.nuclear - lc.ts_burden,
+                        burden_total.as_str(),
+                        a - lc.nuclear_co2e - lc.ts_burden,
                         "K.19",
                     ),
                 ],
@@ -3149,21 +3185,16 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                 vec![
                     (
                         "UPSTREAM_CREDIT",
-                        "Saved upstream gas",
-                        lc.up_credit,
+                        up_name.as_str(),
+                        lc.up_credit_co2e,
                         "K.19",
                     ),
-                    (
-                        "NUCLEAR_LC",
-                        "Nuclear lifecycle burden",
-                        -lc.nuclear,
-                        "K.19",
-                    ),
-                    ("TS_BURDEN", "T&S burden", -lc.ts_burden, "K.19"),
+                    ("NUCLEAR_LC", nuc_name.as_str(), -lc.nuclear_co2e, "K.19"),
+                    ("TS_BURDEN", ts_name.as_str(), -lc.ts_burden, "K.19"),
                     (
                         "ABATEMENT",
-                        "Net abatement",
-                        a + lc.up_credit - lc.nuclear - lc.ts_burden,
+                        up_total.as_str(),
+                        a + lc.up_credit_co2e - lc.nuclear_co2e - lc.ts_burden,
                         "K.19",
                     ),
                 ],
@@ -3180,6 +3211,13 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
         ];
         for (view, lines) in views {
             for (lid, name, v, eq) in lines {
+                // The transport and storage burden is CO2 and keeps the plain
+                // ledger source; every other lifecycle line names its CO2e terms.
+                let view_source = if view.starts_with("lifecycle_") && lid != "TS_BURDEN" {
+                    lc_source.as_str()
+                } else {
+                    source
+                };
                 c.row(&[
                     t(run_id),
                     t(bid),
@@ -3191,7 +3229,7 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                     num(per_pass),
                     num(plant),
                     t("calculated"),
-                    t(source),
+                    t(view_source),
                     t(eq),
                     t(status),
                 ]);

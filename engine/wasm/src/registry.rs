@@ -871,7 +871,7 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ),
     (
         "abatement_lifecycle_t_y",
-        "Annual abatement, lifecycle view with upstream gas",
+        "Annual abatement, lifecycle view with upstream gas (CO2e total, GWP100 basis of the upstream factor)",
         "t/y",
     ),
     (

@@ -1185,12 +1185,19 @@ fn rating_100_is_infeasible_and_no_case_is_met() {
     }
 }
 
-/// With stage 10OAK_P46 and gas at S$25/GJ the selected case sits below the
-/// target; the case list carries it with the same verdict as the strip, and
-/// every verdict follows feasibility and both methods.
+/// With stage 10OAK_P46, gas at S$25/GJ and transport and storage at S$40/t the
+/// selected case sits below the target; the case list carries it with the same
+/// verdict as the strip, and every verdict follows feasibility and both methods.
+/// The reference gas of the cost ledger is the gas that the central intensity
+/// implies (rule 1 of N.7), which saves less gas than INL's conventional plant
+/// did, so the earlier fixture of gas alone no longer reaches the target: it read
+/// 102.9 and 103.2 S$/t on the independent basis.
 #[test]
 fn ten_oak_at_25_gas_reads_one_verdict() {
-    let r = solve_with(json!({"stage": "10OAK_P46", "gas_s_gj": 25}), true);
+    let r = solve_with(
+        json!({"stage": "10OAK_P46", "gas_s_gj": 25, "ts_s_t": 40}),
+        true,
+    );
     assert_eq!(r["status"], "ok", "{}", r["messages"]);
     let cost = &r["targets"]["cost"];
     let t = cost["target"].as_f64().unwrap();

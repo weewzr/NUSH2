@@ -752,15 +752,15 @@ fn compare_es(st: &mut GoldStats, m: &Model, g: &Value) -> Result<()> {
         "heat_plus_recycle_no_capture",
         e.baseline - e.captured - e.atm,
     )?;
-    let lc = m.lifecycle_terms(&bb, sb, bb.r);
+    let lc = m.lifecycle_terms(&bb, sb, bb.r)?;
     let ab = e.a_atm;
-    let net = lc.up_credit - lc.nuclear - lc.ts_burden;
+    let net = lc.up_credit_co2e - lc.nuclear_co2e - lc.ts_burden;
     for (k, x) in [
-        ("up_credit", lc.up_credit),
-        ("nuclear", lc.nuclear),
+        ("up_credit", lc.up_credit_co2e),
+        ("nuclear", lc.nuclear_co2e),
         ("ts_burden", lc.ts_burden),
         ("net_adjust", net),
-        ("A_burdens_only", ab - lc.nuclear - lc.ts_burden),
+        ("A_burdens_only", ab - lc.nuclear_co2e - lc.ts_burden),
         ("A_with_upstream", ab + net),
         ("A_ts_inside", ab - lc.ts_burden),
     ] {

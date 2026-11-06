@@ -1094,7 +1094,14 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
     }
 
     // Gas saving on Ahn's 18.8% in place of the INL pair.
-    let saving = |ng: f64| 1.0 - ng / (m.ng_conv * b0.c.h_scale);
+    // The unabated reference is the one the cost ledger prices: the gas that the
+    // central intensity implies on the independent basis, INL's on the legacy one.
+    let ng_ref = if b0.c.src == CarbonSrc::Plant {
+        m.reference_gas_mmscfd(&b0.c, b0.s)? / b0.s
+    } else {
+        m.ng_conv * b0.c.h_scale
+    };
+    let saving = |ng: f64| 1.0 - ng / ng_ref;
     let s_inl = saving(b0.c.ng);
     let s_ahn = saving(m.ng_ahn_equivalent);
     w.push(

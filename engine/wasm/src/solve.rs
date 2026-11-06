@@ -815,7 +815,7 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     let cp = cost_point(&m, &b, r.stage, life, n, r_ch)?;
     let e = sol.emissions;
     let sys = m.system_adjust(&b, s);
-    let lc = m.lifecycle_terms(&b, s, b.r);
+    let lc = m.lifecycle_terms(&b, s, b.r)?;
     let per_pass = if r.scn == Scenario::InlSel {
         m.eta_sel
     } else {
@@ -853,7 +853,7 @@ pub fn evaluate(r: &Resolved, base: &ParamSet, kpi_only: bool) -> Result<Solved,
     put("abatement_system_t_y", e.a_net + sys);
     put(
         "abatement_lifecycle_t_y",
-        e.a_direct + lc.up_credit - lc.nuclear - lc.ts_burden,
+        e.a_direct + lc.up_credit_co2e - lc.nuclear_co2e - lc.ts_burden,
     );
     put("cost_s_per_t", cp.ac_l5);
     put("cost_l3_s_per_t", cp.ac_l3);

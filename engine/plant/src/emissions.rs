@@ -3,6 +3,7 @@
 
 use crate::abatement::BaselineKind;
 use crate::anchored::{Balance, Carbon, CarbonSrc, Model};
+use nush2_numerics::Result;
 use nush2_props::units::{MMBTU_GJ, ST};
 use serde::Serialize;
 
@@ -40,11 +41,18 @@ pub struct Emissions {
     pub a_net: f64,
 }
 
-/// Lifecycle adjustment terms, t/y.
+/// Lifecycle adjustment terms, t/y. The first two are CO2e quantities and never
+/// enter a headline CO2 figure (decision D4): the upstream gas factor is stated
+/// in CO2-equivalent at a 100-year potential of 30 (IEA 2026), and the nuclear
+/// factor is a CO2-equivalent range whose horizon the source read does not
+/// state. The transport and storage burden is CO2.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Lifecycle {
-    pub up_credit: f64,
-    pub nuclear: f64,
+    /// Upstream emissions of the gas the plant does not buy, t CO2e/y.
+    pub up_credit_co2e: f64,
+    /// Life-cycle emission of the reactor's electricity, t CO2e/y.
+    pub nuclear_co2e: f64,
+    /// Transport and storage burden, t CO2/y.
     pub ts_burden: f64,
 }
 
@@ -121,23 +129,26 @@ impl Model {
         -lost + power
     }
 
-    /// Lifecycle terms, t/y, charged at reactor rating `r`.
+    /// Lifecycle terms, t/y, charged at reactor rating `r`. The saved upstream
+    /// gas is priced on the gas that the unabated reference takes, the same
+    /// number as the GAS line of the cost ledger (rule 1 of N.7).
     ///
     /// eq: K.19
-    pub fn lifecycle_terms(&self, b: &Balance, s: f64, r: f64) -> Lifecycle {
+    /// eq: N.9.5
+    pub fn lifecycle_terms(&self, b: &Balance, s: f64, r: f64) -> Result<Lifecycle> {
         let c = b.c;
-        let h_s = s * c.h_scale;
         let gj = self.ng_hhv * MMBTU_GJ * self.days;
-        Lifecycle {
-            up_credit: (self.ng_conv * h_s - c.ng * s) * gj * self.ef_up / 1000.0,
-            nuclear: r * self.eta_pwr * self.hours * self.ef_nuc / 1000.0,
+        let n_ref = self.reference_gas_mmscfd(&c, s)?;
+        Ok(Lifecycle {
+            up_credit_co2e: (n_ref - c.ng * s) * gj * self.ef_up / 1000.0,
+            nuclear_co2e: r * self.eta_pwr * self.hours * self.ef_nuc / 1000.0,
             ts_burden: self.tpy(c.cap, s)
                 * if c.src == CarbonSrc::Plant {
                     self.ts_parts().total()
                 } else {
                     self.ts_burden
                 },
-        }
+        })
     }
 
     /// Outage hours run on a gas-fired conventional train, H2 sold as extra.

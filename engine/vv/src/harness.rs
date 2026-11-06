@@ -549,8 +549,58 @@ pub fn independent_rows_on(p: &ParamSet) -> Result<Vec<Row>> {
             "MMSCFD",
             None,
             SAME,
-            "The GAS line of the cost ledger keeps INL's reference gas; this row prints the gap to \
-             the gas that the central intensity implies",
+            "The GAS line of the cost ledger, the saved upstream gas of the lifecycle view and the avoided-gas term of N.9.2 all use the implied gas (rule 1 of N.7). INL's gas stays here as a comparison and in the cost rows that follow",
+        ));
+        // The cost under INL's reference gas, printed beside the default so that
+        // the effect of the copied value is visible. The default carries the
+        // implied gas.
+        let q = CostQuery::central(Stage::Boak, 25.0, m.n_linear, m.r_rated);
+        let q_inl = CostQuery {
+            ng_smr: Some(inl_ref),
+            ..q
+        };
+        let led = m.ledger(&b, &q)?;
+        let led_inl = m.ledger(&b, &q_inl)?;
+        let cost_cond = "B_REC_F, BOAK, 25 y, linear exponent, rated reactor charged, base registry (Anchored preset; the Headline preset of the exported tables differs from it by less than 1e-4 relative); the literature column holds the value under INL's reference gas";
+        let cost_note = "Reported only, no limit. The default prices the gas that the central intensity implies (rule 1 of N.7); the comparison prices INL's conventional-plant gas, a published value for a different plant";
+        rows.push(ind_row(
+            "IND_GAS_LINE_UNDER_INL_GAS",
+            "L0 gas line of the cost ledger, implied reference gas against INL's",
+            src,
+            "equation N.7.3 and rule 1 of the boundary table",
+            cost_cond,
+            Some(led_inl.gas),
+            led.gas,
+            "S$M/y",
+            None,
+            SAME,
+            cost_note,
+        ));
+        rows.push(ind_row(
+            "IND_L5_UNDER_INL_GAS",
+            "Abatement cost at L5, implied reference gas against INL's",
+            src,
+            "equation N.7.3 and rule 1 of the boundary table",
+            cost_cond,
+            Some(led_inl.l5() * 1e6 / e.a_net),
+            led.l5() * 1e6 / e.a_net,
+            "S$/t",
+            None,
+            SAME,
+            cost_note,
+        ));
+        rows.push(ind_row(
+            "IND_LAC_DCF_UNDER_INL_GAS",
+            "Abatement cost of the discounted cash flow, implied reference gas against INL's",
+            src,
+            "equation N.7.3 and rule 1 of the boundary table",
+            cost_cond,
+            Some(m.dcf(&b, &q_inl)?.lac),
+            m.dcf(&b, &q)?.lac,
+            "S$/t",
+            None,
+            SAME,
+            cost_note,
         ));
         if let Some(floor_gas) = ab.floor_gas_mmscfd {
             rows.push(ind_row(

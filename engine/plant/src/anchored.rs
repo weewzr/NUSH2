@@ -275,7 +275,11 @@ pub struct Model {
     pub price_e: f64,
     pub ef_grid: f64,
     pub ef_ng_lhv: f64,
+    /// Upstream gas supply intensity, kg CO2e/GJ at the 100-year potential of
+    /// `gwp_up` (IEA 2026). A CO2e quantity, never a CO2 one.
     pub ef_up: f64,
+    /// Methane warming potential (100 years) inside `ef_up`, t CO2e/t CH4.
+    pub gwp_up: f64,
     pub ts_burden: f64,
     pub ef_nuc: f64,
     pub system_boiler_eff: f64,
@@ -848,6 +852,7 @@ impl Model {
             ef_grid: r.get("GRID_EF")?,
             ef_ng_lhv: r.get("EF_NG_LHV")?,
             ef_up: r.get("EF_UPSTREAM")?,
+            gwp_up: r.get("EF_UPSTREAM_GWP100")?,
             ts_burden: r.get("TS_BURDEN")?,
             ef_nuc: r.get("EF_NUCLEAR")?,
             system_boiler_eff: r.get("SYSTEM_BOILER_EFF")?,
@@ -1467,17 +1472,23 @@ impl Model {
         k.insert("h2_nm3_h", h2_kgh / self.rho_h2n);
         k.insert("hours", self.hours);
         k.insert("days", self.days);
+        // The unabated reference gas is the one number of the GAS line of the
+        // cost ledger: the gas that the central intensity implies on the
+        // independent basis, INL's conventional-plant gas on the legacy one.
+        let (ng_ref, ng_saved) = if plant {
+            let n = self.reference_gas_mmscfd(&c, s)?;
+            (n, n - ng_plant * s)
+        } else {
+            (self.ng_conv * s, (self.ng_conv - ng_plant) * s)
+        };
         k.insert("ng_mmscfd", ng_plant * s);
-        k.insert("ng_unabated_mmscfd", self.ng_conv * s);
+        k.insert("ng_unabated_mmscfd", ng_ref);
         k.insert("ng_norecycle_mmscfd", self.ng_norec * s);
-        k.insert("ng_saved_mmscfd", (self.ng_conv - ng_plant) * s);
-        k.insert(
-            "ng_gj_d_saved",
-            (self.ng_conv - ng_plant) * s * gj_per_mmscf,
-        );
+        k.insert("ng_saved_mmscfd", ng_saved);
+        k.insert("ng_gj_d_saved", ng_saved * gj_per_mmscf);
         k.insert(
             "gas_saving_SM_y",
-            (self.ng_conv - ng_plant) * s * gj_per_mmscf * self.days * self.gas.central / 1e6,
+            ng_saved * gj_per_mmscf * self.days * self.gas.central / 1e6,
         );
         k.insert("feed_C_kmol_h", if plant { c.f * s } else { self.f_c6 * s });
         k.insert("tube_C_kmol_h", c.t * s);

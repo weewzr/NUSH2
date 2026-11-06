@@ -446,6 +446,18 @@ locator = "whole report"
 source_status = "not_verified"
 
 [[param]]
+id = "EF_UPSTREAM_GWP100"
+value = 30.0
+unit = "t CO2e/t CH4"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEA 2026, Assessing Emissions from LNG Supply and Abatement Options, PDF p. 6: the upstream intensity EF_UPSTREAM is stated in CO2-equivalent with a 100-year global warming potential of 30 for methane. This entry labels EF_UPSTREAM; the sources read give only the aggregate, so the CO2 and CH4 parts of the upstream factor are not separated"
+locator = "PDF p. 4 (11.5 g CO2-eq/MJ) and p. 6 (GWP100 = 30)"
+source_status = "primary"
+name = "Warming potential behind the upstream gas factor"
+
+[[param]]
 id = "TS_BURDEN"
 value = 0.025
 unit = "t/t"

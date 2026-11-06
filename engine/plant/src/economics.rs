@@ -55,6 +55,11 @@ pub struct CostQuery {
     pub r: Option<f64>,
     pub export_rev: f64,
     pub ng_override: Option<f64>,
+    /// Gas of the unabated reference plant, MMSCFD. `None` takes the reference
+    /// of the carbon basis: the gas that the central intensity implies on the
+    /// independent basis, INL's conventional-plant gas on the legacy one. A value
+    /// here is a comparison (the L5 and DCF under INL's gas, for example).
+    pub ng_smr: Option<f64>,
     pub capt_k: Option<f64>,
     pub fom: Option<f64>,
     pub rx_mult: f64,
@@ -77,6 +82,7 @@ impl CostQuery {
             r: Some(r),
             export_rev: 0.0,
             ng_override: None,
+            ng_smr: None,
             capt_k: None,
             fom: None,
             rx_mult: 1.0,
@@ -283,7 +289,12 @@ impl Model {
         let h_s = s * c.h_scale;
         let annual_cap = self.tpy(c.cap, s);
         let gj_per_mmscf = self.ng_hhv * MMBTU_GJ;
-        let ng_smr = self.ng_conv * h_s;
+        // One reference gas for the cost and the carbon (rule 1 of N.7): the
+        // GAS line prices the same n_ref - n_NG that N.9.2 turns into carbon.
+        let ng_smr = match q.ng_smr {
+            Some(n) => n,
+            None => self.reference_gas_mmscfd(&c, s)?,
+        };
         let ng_plant = q.ng_override.unwrap_or(c.ng) * s;
 
         let cap_rx = self.reactor_capex(r_charged, lv, q.stage, q.n) * q.rx_mult;

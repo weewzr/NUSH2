@@ -75,6 +75,7 @@ DISCOUNT,cost,Discount,0.08,0.08,0.08,-,,,assumed,fixed_assumption,Project basis
 EF_NG_LHV,carbon,Ef ng lhv,56.1,56.1,56.1,kg/GJ LHV,,,published,fixed_assumption,"IPCC 2006 Guidelines, Volume 2, Chapter 2, Table 2.2, natural gas, not verified","Vol. 2, Ch. 2, Table 2.2",not_verified,,,input
 EF_NUCLEAR,carbon,Ef nuclear,5.5,5.5,5.5,kg/MWh,,,published,fixed_assumption,"UNECE 2022, Life Cycle Assessment of Electricity Generation Options, nuclear, not verified",whole report,not_verified,,,input
 EF_UPSTREAM,carbon,Ef upstream,11.5,11.5,11.5,kg/GJ,,,published,fixed_assumption,"IEA 2026, Assessing Emissions from LNG Supply and Abatement Options, not verified",whole report,not_verified,,,input
+EF_UPSTREAM_GWP100,carbon,Warming potential behind the upstream gas factor,30,30,30,t CO2e/t CH4,,,published,fixed_assumption,"IEA 2026, Assessing Emissions from LNG Supply and Abatement Options, PDF p. 6: the upstream intensity EF_UPSTREAM is stated in CO2-equivalent with a 100-year global warming potential of 30 for methane. This entry labels EF_UPSTREAM; the sources read give only the aggregate, so the CO2 and CH4 parts of the upstream factor are not separated",PDF p. 4 (11.5 g CO2-eq/MJ) and p. 6 (GWP100 = 30),primary,,,input
 ELECTRICITY_PRICE,cost,Electricity price,0.2,0.2,0.2,S$/kWh,,,assumed,fixed_assumption,"Author assumption, not verified",author assumption,not_verified,,,input
 ETA_BOILER,heat,Eta boiler,0.85,0.85,0.85,-,,,assumed,fixed_assumption,"Tail-gas boiler, LHV basis",whole source,primary,,,input
 ETA_MEA,carbon,Eta mea,0.9,0.9,0.9,-,0.8,0.95,assumed,fixed_assumption,"Author design value of the MEA train, 90% per pass on absorber-inlet CO2 (decision D25); the CAPTURE sweep runs 80 to 95%",D25,via_reader,,,input
@@ -269,30 +270,30 @@ VESSEL_LOSS_HTTR,heat,Vessel loss httr,0.81,0.81,0.81,MW,,,published,fixed_assum
 VESSEL_LOSS_REF_MW,heat,Vessel loss ref mw,30,30,30,MW,,,published,fixed_assumption,"TECDOC-1382 Table 3-21 (PDF p164), measured","Table 3, PDF p164",primary,,,input
 WATER_GPM_CASE_A,production,Water gpm case a,,743,743,gpm,,,published,fixed_assumption,"TEV-961 Table 2 doc p16 (PDF p17): Case 6 process water, which excludes reactor heat rejection","Table 2, PDF p17, doc p16",primary,,,input
 W_MEA,conditions,W mea,0.3,0.3,0.3,kg/kg,,,assumed,fixed_assumption,Project solvent,whole source,primary,,D25,input
-AC_L3_BOAK_25Y_N0P31,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 0.31, 210 MWth charged",301.357732,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_BOAK_25Y_N0P60,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 0.60, 210 MWth charged",220.344169,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_BOAK_25Y_N1P00,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 1.00, 210 MWth charged",142.064911,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_BOAK_60Y_N0P31,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 0.31, 210 MWth charged",261.946065,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_BOAK_60Y_N0P60,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 0.60, 210 MWth charged",190.196597,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_BOAK_60Y_N1P00,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 1.00, 210 MWth charged",120.868761,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_25Y_N0P31,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 0.31, 210 MWth charged",455.693709,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_25Y_N0P60,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 0.60, 210 MWth charged",334.254993,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_25Y_N1P00,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 1.00, 210 MWth charged",216.914981,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_60Y_N0P31,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 0.31, 210 MWth charged",395.060848,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_60Y_N0P60,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 0.60, 210 MWth charged",288.444686,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L3_FOAK_60Y_N1P00,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 1.00, 210 MWth charged",185.426948,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
-AC_L5_BOAK_25Y_N0P31,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 0.31, 210 MWth charged",381.490280,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_BOAK_25Y_N0P60,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 0.60, 210 MWth charged",287.159304,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_BOAK_25Y_N1P00,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 1.00, 210 MWth charged",196.012113,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_BOAK_60Y_N0P31,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 0.31, 210 MWth charged",334.688188,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_BOAK_60Y_N0P60,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 0.60, 210 MWth charged",251.452452,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_BOAK_60Y_N1P00,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 1.00, 210 MWth charged",171.026022,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_25Y_N0P31,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 0.31, 210 MWth charged",568.075390,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_25Y_N0P60,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 0.60, 210 MWth charged",425.328815,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_25Y_N1P00,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 1.00, 210 MWth charged",287.400109,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_60Y_N0P31,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 0.31, 210 MWth charged",495.617849,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_60Y_N0P60,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 0.60, 210 MWth charged",370.623657,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
-AC_L5_FOAK_60Y_N1P00,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 1.00, 210 MWth charged",249.848171,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L3_BOAK_25Y_N0P31,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 0.31, 210 MWth charged",308.525952,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_BOAK_25Y_N0P60,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 0.60, 210 MWth charged",227.512388,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_BOAK_25Y_N1P00,cost,"Ledger abatement cost at L3, BOAK, 25 y, n = 1.00, 210 MWth charged",149.233131,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_BOAK_60Y_N0P31,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 0.31, 210 MWth charged",269.114285,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_BOAK_60Y_N0P60,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 0.60, 210 MWth charged",197.364817,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_BOAK_60Y_N1P00,cost,"Ledger abatement cost at L3, BOAK, 60 y, n = 1.00, 210 MWth charged",128.036981,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_25Y_N0P31,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 0.31, 210 MWth charged",462.861929,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_25Y_N0P60,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 0.60, 210 MWth charged",341.423213,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_25Y_N1P00,cost,"Ledger abatement cost at L3, FOAK, 25 y, n = 1.00, 210 MWth charged",224.083201,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_60Y_N0P31,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 0.31, 210 MWth charged",402.229068,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_60Y_N0P60,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 0.60, 210 MWth charged",295.612906,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L3_FOAK_60Y_N1P00,cost,"Ledger abatement cost at L3, FOAK, 60 y, n = 1.00, 210 MWth charged",192.595168,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,anchored_port
+AC_L5_BOAK_25Y_N0P31,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 0.31, 210 MWth charged",388.658500,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_BOAK_25Y_N0P60,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 0.60, 210 MWth charged",294.327524,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_BOAK_25Y_N1P00,cost,"Ledger abatement cost at L5, BOAK, 25 y, n = 1.00, 210 MWth charged",203.180333,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_BOAK_60Y_N0P31,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 0.31, 210 MWth charged",341.856408,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_BOAK_60Y_N0P60,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 0.60, 210 MWth charged",258.620671,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_BOAK_60Y_N1P00,cost,"Ledger abatement cost at L5, BOAK, 60 y, n = 1.00, 210 MWth charged",178.194242,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_25Y_N0P31,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 0.31, 210 MWth charged",575.243610,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_25Y_N0P60,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 0.60, 210 MWth charged",432.497035,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_25Y_N1P00,cost,"Ledger abatement cost at L5, FOAK, 25 y, n = 1.00, 210 MWth charged",294.568329,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_60Y_N0P31,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 0.31, 210 MWth charged",502.786068,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_60Y_N0P60,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 0.60, 210 MWth charged",377.791877,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
+AC_L5_FOAK_60Y_N1P00,cost,"Ledger abatement cost at L5, FOAK, 60 y, n = 1.00, 210 MWth charged",257.016390,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,D08,gated_T05
 DRIFT_ANCHORED_ABATEMENT_T_Y,drift,"Drift check, Anchored preset, Case B REC_F abatement",578051.611700,,,t/y,,,calculated,reduced_order,engine anchored port,see equation,,K.11,,anchored_port
 DRIFT_ANCHORED_E_TOTAL_MWE,drift,"Drift check, Anchored preset, Case B REC_F electricity",19.790604,,,MWe,,,calculated,reduced_order,engine anchored port,see equation,,J.24,,anchored_port
 DRIFT_ANCHORED_GAP_MW,drift,"Drift check, Anchored preset, Case B REC_F reboiler gap",13.823285,,,MW,,,calculated,reduced_order,engine anchored port,see equation,,J.18,,anchored_port
@@ -366,18 +367,18 @@ L4_T10_TOTAL_KPA_N199,nuclear,"Secondary loop drop, reformer plus IHX tubes, at 
 L4_T10_TOTAL_KPA_N327,nuclear,"Secondary loop drop, reformer plus IHX tubes, at 327 reformer tubes",38.847602,,,kPa,,,calculated,reduced_order,engine Level 4 heat recovery and utility,see equation,,C.16,,level4_m8
 L4_W_CIRC_PRIM_MW,nuclear,Primary circulator shaft power on the B.9 flow,3.568204,,,MW,,,calculated,reduced_order,engine Level 4 heat recovery and utility,see equation,,B.10,,level4_m8
 L4_W_CIRC_SEC_MW,nuclear,Secondary circulator shaft power on the B.9 flow,3.130585,,,MW,,,calculated,reduced_order,engine Level 4 heat recovery and utility,see equation,,B.10,,level4_m8
-LAC_DCF_BOAK_25Y_N0P31,cost,"Levelised abatement cost, BOAK, 25 y, n = 0.31, 210 MWth charged",382.151277,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_BOAK_25Y_N0P60,cost,"Levelised abatement cost, BOAK, 25 y, n = 0.60, 210 MWth charged",287.647167,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_BOAK_25Y_N1P00,cost,"Levelised abatement cost, BOAK, 25 y, n = 1.00, 210 MWth charged",196.332684,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_BOAK_60Y_N0P31,cost,"Levelised abatement cost, BOAK, 60 y, n = 0.31, 210 MWth charged",335.326964,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_BOAK_60Y_N0P60,cost,"Levelised abatement cost, BOAK, 60 y, n = 0.60, 210 MWth charged",251.941899,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_BOAK_60Y_N1P00,cost,"Levelised abatement cost, BOAK, 60 y, n = 1.00, 210 MWth charged",171.371181,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_25Y_N0P31,cost,"Levelised abatement cost, FOAK, 25 y, n = 0.31, 210 MWth charged",569.132985,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_25Y_N0P60,cost,"Levelised abatement cost, FOAK, 25 y, n = 0.60, 210 MWth charged",426.109394,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_25Y_N1P00,cost,"Levelised abatement cost, FOAK, 25 y, n = 1.00, 210 MWth charged",287.913023,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_60Y_N0P31,cost,"Levelised abatement cost, FOAK, 60 y, n = 0.31, 210 MWth charged",496.598690,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_60Y_N0P60,cost,"Levelised abatement cost, FOAK, 60 y, n = 0.60, 210 MWth charged",371.365573,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
-LAC_DCF_FOAK_60Y_N1P00,cost,"Levelised abatement cost, FOAK, 60 y, n = 1.00, 210 MWth charged",250.359225,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_25Y_N0P31,cost,"Levelised abatement cost, BOAK, 25 y, n = 0.31, 210 MWth charged",389.319497,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_25Y_N0P60,cost,"Levelised abatement cost, BOAK, 25 y, n = 0.60, 210 MWth charged",294.815386,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_25Y_N1P00,cost,"Levelised abatement cost, BOAK, 25 y, n = 1.00, 210 MWth charged",203.500904,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_60Y_N0P31,cost,"Levelised abatement cost, BOAK, 60 y, n = 0.31, 210 MWth charged",342.495183,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_60Y_N0P60,cost,"Levelised abatement cost, BOAK, 60 y, n = 0.60, 210 MWth charged",259.110119,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_BOAK_60Y_N1P00,cost,"Levelised abatement cost, BOAK, 60 y, n = 1.00, 210 MWth charged",178.539401,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_25Y_N0P31,cost,"Levelised abatement cost, FOAK, 25 y, n = 0.31, 210 MWth charged",576.301205,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_25Y_N0P60,cost,"Levelised abatement cost, FOAK, 25 y, n = 0.60, 210 MWth charged",433.277614,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_25Y_N1P00,cost,"Levelised abatement cost, FOAK, 25 y, n = 1.00, 210 MWth charged",295.081243,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_60Y_N0P31,cost,"Levelised abatement cost, FOAK, 60 y, n = 0.31, 210 MWth charged",503.766910,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_60Y_N0P60,cost,"Levelised abatement cost, FOAK, 60 y, n = 0.60, 210 MWth charged",378.533793,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
+LAC_DCF_FOAK_60Y_N1P00,cost,"Levelised abatement cost, FOAK, 60 y, n = 1.00, 210 MWth charged",257.527445,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,D08,gated_T05
 LCOH_NUSH2_BOAK_25Y_N0P31,cost,"LCOH of NUS-H2, BOAK, 25 y, n = 0.31, 210 MWth charged",6.803065,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
 LCOH_NUSH2_BOAK_25Y_N0P60,cost,"LCOH of NUS-H2, BOAK, 25 y, n = 0.60, 210 MWth charged",6.015443,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
 LCOH_NUSH2_BOAK_25Y_N1P00,cost,"LCOH of NUS-H2, BOAK, 25 y, n = 1.00, 210 MWth charged",5.254404,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
@@ -390,18 +391,18 @@ LCOH_NUSH2_FOAK_25Y_N1P00,cost,"LCOH of NUS-H2, FOAK, 25 y, n = 1.00, 210 MWth c
 LCOH_NUSH2_FOAK_60Y_N0P31,cost,"LCOH of NUS-H2, FOAK, 60 y, n = 0.31, 210 MWth charged",7.758145,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
 LCOH_NUSH2_FOAK_60Y_N0P60,cost,"LCOH of NUS-H2, FOAK, 60 y, n = 0.60, 210 MWth charged",6.714419,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
 LCOH_NUSH2_FOAK_60Y_N1P00,cost,"LCOH of NUS-H2, FOAK, 60 y, n = 1.00, 210 MWth charged",5.705921,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,gated_T05
-LCOH_SMR_BOAK_25Y_N0P31,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 0.31, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_BOAK_25Y_N0P60,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 0.60, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_BOAK_25Y_N1P00,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 1.00, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_BOAK_60Y_N0P31,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 0.31, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_BOAK_60Y_N0P60,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 0.60, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_BOAK_60Y_N1P00,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 1.00, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_25Y_N0P31,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 0.31, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_25Y_N0P60,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 0.60, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_25Y_N1P00,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 1.00, 210 MWth charged",3.618117,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_60Y_N0P31,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 0.31, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_60Y_N0P60,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 0.60, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
-LCOH_SMR_FOAK_60Y_N1P00,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 1.00, 210 MWth charged",3.619362,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_25Y_N0P31,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 0.31, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_25Y_N0P60,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 0.60, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_25Y_N1P00,cost,"LCOH of the unabated SMR, BOAK, 25 y, n = 1.00, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_60Y_N0P31,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 0.31, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_60Y_N0P60,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 0.60, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_BOAK_60Y_N1P00,cost,"LCOH of the unabated SMR, BOAK, 60 y, n = 1.00, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_25Y_N0P31,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 0.31, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_25Y_N0P60,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 0.60, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_25Y_N1P00,cost,"LCOH of the unabated SMR, FOAK, 25 y, n = 1.00, 210 MWth charged",3.558375,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_60Y_N0P31,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 0.31, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_60Y_N0P60,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 0.60, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
+LCOH_SMR_FOAK_60Y_N1P00,cost,"LCOH of the unabated SMR, FOAK, 60 y, n = 1.00, 210 MWth charged",3.559620,,,S$/kg,,,calculated,reduced_order,engine anchored port,see equation,,L.35,D08,anchored_port
 M6_ISLAND_CONDENSER_MW,heat,"Capture island stripper condenser duty, M6 column model at its Case B design point; the Headline preset keeps the columns anchored because the M6 gate failed",12.837475,,,MW,,,calculated,reduced_order,engine M6 column models,see equation,,I.7,,model_m6
 M6_ISLAND_LEAN_COOLER_MW,heat,"Capture island lean cooler duty, M6 column model at its Case B design point; the Headline preset keeps the columns anchored because the M6 gate failed",35.542394,,,MW,,,calculated,reduced_order,engine M6 column models,see equation,,,,model_m6
 M6_ISLAND_REBOILER_MW,heat,"Capture island reboiler duty, M6 column model at its Case B design point; the Headline preset keeps the columns anchored because the M6 gate failed",48.910000,,,MW,,,calculated,reduced_order,engine M6 column models,see equation,,I.6,,model_m6
@@ -436,7 +437,7 @@ RES_FEED_CARBON_T_Y,carbon,"Feed carbon as CO2: captured, to atmosphere and the 
 RES_FEED_C_KMOL_H,carbon,Feed c kmol h,1212.252276,1784.379202,1774.163674,kmol/h,,,calculated,reduced_order,engine anchored port,see equation,,J.5,,carbon_independent
 RES_GAS_SAVED_CARBON_T_Y,carbon,Baseline CO2 less the feed carbon as CO2,204805.264184,,,t/y,,,calculated,reduced_order,engine anchored port,see equation,,K.11,D07,carbon_independent
 RES_GAS_SAVING_AHN,carbon,Gas saved against the unabated SMR on Ahn's equivalent pair,0.188038,,,-,,,calculated,reduced_order,engine anchored port,see equation,,L.16,D07,carbon_independent
-RES_GAS_SAVING_INL,carbon,Gas saved against the unabated SMR on the INL pair,0.356089,,,-,,,calculated,reduced_order,engine anchored port,see equation,,L.16,D07,carbon_independent
+RES_GAS_SAVING_INL,carbon,Gas saved against the unabated reference implied by the central intensity,0.341777,,,-,,,calculated,reduced_order,engine anchored port,see equation,,L.16,D07,carbon_independent
 RES_GRID_IMPORT_AT_RATED_MWE,power,Grid import at rated size,0.000000,12.866470,22.102853,MWe,,,calculated,reduced_order,engine anchored port,see equation,,J.29,D03,gated_T05
 RES_H2_KG_H,production,H2 kg h,8988.000000,13154.178730,13154.178730,kg/h,,,calculated,reduced_order,engine anchored port,see equation,,J.2,D03,anchored_port
 RES_H2_T_Y,production,H2 t y,66924.648000,97946.014824,97946.014824,t/y,,,calculated,reduced_order,engine anchored port,see equation,,J.3,D03,anchored_port
@@ -447,7 +448,7 @@ RES_INTENSITY_KG_KG,carbon,Intensity kg kg,0.485756,0.380623,0.485756,kg/kg,,,ca
 RES_MARGIN_210_MWTH,heat,Margin 210 mwth,31.506136,-32.409245,-50.744768,MWth,,,calculated,reduced_order,engine anchored port,see equation,,J.36,D03,gated_T05
 RES_NG_MMSCFD,production,Ng mmscfd,23.098553,34.000000,33.805351,MMSCFD,,,calculated,reduced_order,engine anchored port,see equation,,J.4,,carbon_independent
 RES_NG_NORECYCLE_MMSCFD,production,Ng norecycle mmscfd,30.406003,44.500000,44.500000,MMSCFD,,,calculated,reduced_order,engine anchored port,see equation,,J.4,,anchored_port
-RES_NG_UNABATED_MMSCFD,production,Ng unabated mmscfd,35.872251,52.500000,52.500000,MMSCFD,,,calculated,reduced_order,engine anchored port,see equation,,J.4,,anchored_port
+RES_NG_UNABATED_MMSCFD,production,"Natural gas of the unabated reference plant, implied by the central intensity",35.092267,51.358473,51.358473,MMSCFD,,,calculated,reduced_order,engine anchored port,see equation,,J.4,,carbon_independent
 RES_PLANT_CAPTURE,carbon,Plant capture,0.914483,0.932583,0.914483,-,,,calculated,reduced_order,engine anchored port,see equation,,J.33,D07,carbon_independent
 RES_POWER_BRANCH_MWTH,heat,Power branch mwth,59.574119,69.882057,87.161139,MWth,,,calculated,reduced_order,engine anchored port,see equation,,B.20,,gated_T05
 RES_PROCESS_HEAT_MW,heat,Process heat mw,120.804075,176.800000,176.800000,MWth,,,calculated,reduced_order,engine anchored port,see equation,,J.14,,anchored_port
@@ -470,14 +471,14 @@ RES_SOLVENT_T_H,conditions,Solvent t h,902.830799,1355.227917,1321.317055,t/h,,,
 RES_STACK_T_Y,carbon,Stack CO2 of the burned nitrogen-rich cut,30778.465382,35080.710840,45045.108441,t/y,,,calculated,reduced_order,engine anchored port,see equation,,N.5.2,D07,carbon_independent
 RES_TAILGAS_C_KMOL_H,carbon,Tailgas c kmol h,378.998728,431.975559,554.674790,kmol/h,,,calculated,reduced_order,engine anchored port,see equation,,J.10,D04,carbon_independent
 RES_TARGET_ABATEMENT_MARGIN_T_Y,cost,Abatement above the target,307767.415516,,,t/y,,,calculated,reduced_order,engine anchored port,see equation,,K.22,,anchored_port
-RES_TARGET_COST_EXCESS_DCF_BOAK_25Y,cost,"Levelised abatement cost above the target, positive means missed",96.332684,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
-RES_TARGET_COST_EXCESS_DCF_BOAK_60Y,cost,"Levelised abatement cost above the target, positive means missed",71.371181,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
-RES_TARGET_COST_EXCESS_DCF_FOAK_25Y,cost,"Levelised abatement cost above the target, positive means missed",187.913023,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
-RES_TARGET_COST_EXCESS_DCF_FOAK_60Y,cost,"Levelised abatement cost above the target, positive means missed",150.359225,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
-RES_TARGET_COST_EXCESS_L5_BOAK_25Y,cost,"L5 abatement cost above the target, positive means missed",96.012113,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
-RES_TARGET_COST_EXCESS_L5_BOAK_60Y,cost,"L5 abatement cost above the target, positive means missed",71.026022,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
-RES_TARGET_COST_EXCESS_L5_FOAK_25Y,cost,"L5 abatement cost above the target, positive means missed",187.400109,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
-RES_TARGET_COST_EXCESS_L5_FOAK_60Y,cost,"L5 abatement cost above the target, positive means missed",149.848171,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
+RES_TARGET_COST_EXCESS_DCF_BOAK_25Y,cost,"Levelised abatement cost above the target, positive means missed",103.500904,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
+RES_TARGET_COST_EXCESS_DCF_BOAK_60Y,cost,"Levelised abatement cost above the target, positive means missed",78.539401,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
+RES_TARGET_COST_EXCESS_DCF_FOAK_25Y,cost,"Levelised abatement cost above the target, positive means missed",195.081243,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
+RES_TARGET_COST_EXCESS_DCF_FOAK_60Y,cost,"Levelised abatement cost above the target, positive means missed",157.527445,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.36,,gated_T05
+RES_TARGET_COST_EXCESS_L5_BOAK_25Y,cost,"L5 abatement cost above the target, positive means missed",103.180333,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
+RES_TARGET_COST_EXCESS_L5_BOAK_60Y,cost,"L5 abatement cost above the target, positive means missed",78.194242,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
+RES_TARGET_COST_EXCESS_L5_FOAK_25Y,cost,"L5 abatement cost above the target, positive means missed",194.568329,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
+RES_TARGET_COST_EXCESS_L5_FOAK_60Y,cost,"L5 abatement cost above the target, positive means missed",157.016390,,,S$/t,,,calculated,reduced_order,engine anchored port,see equation,,L.26,,gated_T05
 RES_TS_EMISSION_T_Y,carbon,"CO2 emitted by conditioning, shipping, injection and storage operations",11777.508486,17679.069339,17236.699113,t/y,,,calculated,reduced_order,engine anchored port,see equation,,N.9.4,D07,carbon_independent
 RES_TS_RATIO,carbon,Transport and storage emissions per tonne of CO2 delivered,0.032420,0.032420,0.032420,t/t,,,calculated,reduced_order,engine anchored port,see equation,,N.9.4,D07,carbon_independent
 RES_TUBE_C_KMOL_H,carbon,Tube c kmol h,1497.326806,2109.301743,2191.377884,kmol/h,,,calculated,reduced_order,engine anchored port,see equation,,J.8,,carbon_independent
