@@ -562,11 +562,12 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
         "status",
     ]);
     for e in p.entries() {
-        input_row(&mut c, e);
+        input_row(&mut c, e, input_role_note(m, &e.id));
     }
     let mut rows: Vec<ResultRow> = Vec::new();
     results_block(m, &mut rows)?;
     dcf_block(m, &mut rows)?;
+    reference_cost_block(m, &mut rows)?;
     term_block(rec, &mut rows);
     level4_block(rec, &mut rows);
     tube_block(&mut rows)?;
@@ -607,7 +608,27 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
     Ok(c.out)
 }
 
-fn input_row(c: &mut Csv, e: &ParamEntry) {
+/// Role of an input on the independent basis, appended to its source text. The
+/// steam export and the purchased power of INL's conventional plant price the
+/// LOST_STEAM and BASE_POWER lines; no source gives the duty of a plant-built
+/// reference, so the two numbers are comparison inputs and not part of the
+/// plant's own balance. The legacy export keeps its committed text.
+fn input_role_note(m: &Model, id: &str) -> Option<&'static str> {
+    if !m.carbon_params.independent() {
+        return None;
+    }
+    match id {
+        "EXPORT_STEAM_CONV" | "E_CONV_NOCC" => Some(
+            "role on the independent basis: comparison input that prices the LOST_STEAM and \
+             BASE_POWER lines on INL's conventional plant, because no source gives the steam \
+             duty or the power of a plant-built reference; Final_Design_Basis.csv prints the \
+             cost with and without the two lines",
+        ),
+        _ => None,
+    }
+}
+
+fn input_row(c: &mut Csv, e: &ParamEntry, role: Option<&str>) {
     let (b, a) = scope(&e.id);
     let v = exact(e.value);
     c.row(&[
@@ -626,7 +647,10 @@ fn input_row(c: &mut Csv, e: &ParamEntry) {
         e.high.map(exact).unwrap_or_default(),
         e.class.clone(),
         e.rigour.clone(),
-        e.source.clone(),
+        match role {
+            Some(r) => format!("{}; {r}", e.source),
+            None => e.source.clone(),
+        },
         e.locator.clone(),
         e.source_status.clone(),
         String::new(),
@@ -894,12 +918,12 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
     for (id, key, group, unit, equation, decision) in keys {
         let parameter = if m.carbon_params.independent() && id == "RES_ABATEMENT_T_Y" {
             format!(
-                "Net abatement after transport and storage against the central reference, {}",
+                "Net abatement after transport and storage against the generic reference intensity (central), {}",
                 m.carbon_params.baseline.id()
             )
         } else if m.carbon_params.independent() && id == "RES_BASELINE_T_Y" {
             format!(
-                "Unabated reference, central: {} times the annual hydrogen",
+                "Unabated reference, central generic reference intensity: {} times the annual hydrogen",
                 m.carbon_params.baseline.id()
             )
         } else if m.carbon_params.independent() && id == "RES_NG_UNABATED_MMSCFD" {
@@ -931,7 +955,7 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
             "A_dir_t_y",
             "t/y",
             "N.9.1",
-            "Direct abatement against the central reference, before transport and storage",
+            "Direct abatement against the generic reference intensity (central), before transport and storage",
         ),
         (
             "RES_TS_EMISSION_T_Y",
@@ -1231,16 +1255,34 @@ pub fn dcf_grid(m: &Model, b: &Balance) -> Result<Vec<(DcfResult, f64)>> {
     Ok(out)
 }
 
+/// Words that tie a cost per tonne to the reference it is divided by. On the
+/// independent basis the abatement is measured against a generic reference
+/// intensity and not against a plant-built reference (decision D2), and the
+/// cost rows say so. Empty on the legacy basis, whose committed text is
+/// unchanged.
+fn reference_words(m: &Model) -> &'static str {
+    if m.carbon_params.independent() {
+        ", abatement against the generic reference intensity"
+    } else {
+        ""
+    }
+}
+
 fn dcf_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
     let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
     for (d, l3) in dcf_grid(m, &b)? {
         let tag = format!("{}_{}Y_{}", d.stage.id(), d.life_y, n_tag(d.n));
         let mut add = |prefix: &str, name: &str, v: f64, unit: &'static str, eq: &'static str| {
+            let per_t = if unit == "S$/t" {
+                reference_words(m)
+            } else {
+                ""
+            };
             rows.push(ResultRow {
                 id: format!("{prefix}_{tag}"),
                 group: "cost",
                 parameter: format!(
-                    "{name}, {}, {} y, n = {:.2}, 210 MWth charged",
+                    "{name}, {}, {} y, n = {:.2}, 210 MWth charged{per_t}",
                     d.stage.id(),
                     d.life_y,
                     d.n
@@ -1270,6 +1312,150 @@ fn dcf_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         add("LAC_DCF", "Levelised abatement cost", d.lac, "S$/t", "L.36");
         add("AC_L5", "Ledger abatement cost at L5", d.l5, "S$/t", "L.26");
         add("AC_L3", "Ledger abatement cost at L3", l3, "S$/t", "L.26");
+    }
+    Ok(())
+}
+
+/// The cost under the plant-built reference and without the two system lines,
+/// printed beside the AC_L5 and LAC_DCF rows they qualify (independent basis
+/// only; the legacy basis has no plant-built reference).
+///
+/// The plant-built reference is the floor of N.7.1 and N.7.3: the same
+/// flowsheet without capture, recycle or firing gas, so its gas and emission
+/// are the lowest the plant's own balance supports. The central rows use the
+/// generic reference intensity (decision D2). Pricing the floor's gas and
+/// dividing by the abatement against it gives the other end of the range.
+///
+/// The LOST_STEAM and BASE_POWER lines price INL's conventional plant, scaled.
+/// The rows `NOSYS_*` drop both and `SYSLINES_*` is the cost per tonne they add.
+///
+/// eq: N.7.1
+/// eq: N.7.3
+/// eq: L.24
+/// eq: S.7e
+fn reference_cost_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
+    if !m.carbon_params.independent() {
+        return Ok(());
+    }
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let Some(fl) = m.floor_reference(&b, b.s)? else {
+        return Ok(());
+    };
+    let a = m.emissions(&b.c, b.s).a_net;
+    let timing = m.subsidy.default_timing;
+    let n = m.n_linear;
+    let mut add =
+        |id: String, name: String, v: Option<f64>, unit: &'static str, eq: &'static str| {
+            rows.push(ResultRow {
+                id,
+                group: "cost",
+                parameter: name,
+                b: v,
+                a_inl: None,
+                a_mea: None,
+                unit,
+                equation: eq,
+                decision: "",
+            });
+        };
+    let floor_note = format!(
+        "plant-built reference without firing gas, a floor of {:.6} kg/kg",
+        fl.kg_kg
+    );
+    let lines =
+        "without the LOST_STEAM and BASE_POWER lines (INL conventional plant, comparison input)";
+    for stage in Stage::ALL {
+        for life in [m.lives[0], m.lives[2]] {
+            let q = CostQuery::central(stage, life, n, m.r_rated);
+            let tag = format!("{}_{}Y_{}", stage.id(), life, n_tag(n));
+            let case = format!("{}, {} y, n = {:.2}, 210 MWth charged", stage.id(), life, n);
+            // Under the plant-built reference: its gas is priced and its
+            // abatement divides the cost.
+            let qf = CostQuery {
+                ng_smr: Some(fl.gas_mmscfd),
+                ..q
+            };
+            add(
+                format!("FLOOR_L5_{tag}"),
+                format!("Ledger abatement cost at L5, {case}, {floor_note}"),
+                Some(m.ledger(&b, &qf)?.l5() * 1e6 / fl.a_net),
+                "S$/t",
+                "L.26",
+            );
+            add(
+                format!("FLOOR_LAC_DCF_{tag}"),
+                format!("Levelised abatement cost, {case}, {floor_note}"),
+                Some(m.dcf_at(&b, &qf, fl.a_net)?.lac),
+                "S$/t",
+                "L.36",
+            );
+            for definition in Definition::ALL {
+                let be = m.breakeven(&b, &qf, definition, timing, fl.a_net)?;
+                for (suffix, name, share) in [
+                    ("L5", "ledger", be.l5.result.share()),
+                    ("DCF", "discounted cash flow", be.dcf.result.share()),
+                    ("BOTH", "both methods", be.both.share()),
+                ] {
+                    add(
+                        format!(
+                            "FLOOR_BREAKEVEN_{}_{suffix}_{}_{}Y",
+                            definition.id(),
+                            stage.id(),
+                            life
+                        ),
+                        format!(
+                            "Break-even grant share, definition {}, {name}, {} grant, {case}, {floor_note}; empty when no share up to the maximum meets the target",
+                            definition.id(),
+                            timing.id()
+                        ),
+                        share,
+                        "-",
+                        "S.7e",
+                    );
+                }
+            }
+            // Without the two lines that price INL's conventional plant.
+            let qn = CostQuery {
+                system_lines: false,
+                ..q
+            };
+            let l5 = m.ledger(&b, &q)?.l5() * 1e6 / a;
+            let l5_n = m.ledger(&b, &qn)?.l5() * 1e6 / a;
+            let d = m.dcf(&b, &q)?.lac;
+            let d_n = m.dcf(&b, &qn)?.lac;
+            add(
+                format!("NOSYS_L5_{tag}"),
+                format!("Ledger abatement cost at L5, {case}, {lines}"),
+                Some(l5_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("NOSYS_LAC_DCF_{tag}"),
+                format!("Levelised abatement cost, {case}, {lines}"),
+                Some(d_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("SYSLINES_L5_{tag}"),
+                format!(
+                    "Cost per tonne at L5 that the LOST_STEAM and BASE_POWER lines add, {case}"
+                ),
+                Some(l5 - l5_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("SYSLINES_LAC_DCF_{tag}"),
+                format!(
+                    "Levelised cost per tonne that the LOST_STEAM and BASE_POWER lines add, {case}"
+                ),
+                Some(d - d_n),
+                "S$/t",
+                "L.24",
+            );
+        }
     }
     Ok(())
 }
@@ -3344,7 +3530,7 @@ fn independent_lines(
     );
     for row in &ab.rows {
         let tag = if row.id == ab.central {
-            " (central)"
+            " (central, generic reference intensity)"
         } else {
             ""
         };
@@ -3456,6 +3642,30 @@ fn independent_lines(
 }
 
 // Class, source, source status and equation of each ledger line.
+/// Line text of a ledger row. On the independent basis the three lines that
+/// depend on the reference plant say which reference they price: the GAS line
+/// the gas that the generic reference intensity implies, and the LOST_STEAM and
+/// BASE_POWER lines the conventional plant of INL, a comparison input because
+/// no source gives the duty of a plant-built reference. The legacy text is
+/// unchanged.
+fn ledger_line_text(m: &Model, src: CarbonSrc, id: &str, line: &str) -> String {
+    if !m.carbon_params.independent() {
+        return line.to_string();
+    }
+    match id {
+        // A run on the anchored carbon (B_REC_FIX) keeps INL's gas.
+        "GAS" if src == CarbonSrc::Plant => {
+            "Gas saved against the unabated reference (gas implied by the generic reference intensity)"
+                .to_string()
+        }
+        "LOST_STEAM" => "Lost steam export (INL conventional plant, comparison input)".to_string(),
+        "BASE_POWER" => {
+            "Baseline purchased power avoided (INL conventional plant, comparison input)".to_string()
+        }
+        _ => line.to_string(),
+    }
+}
+
 fn line_meta(id: &str) -> (&'static str, &'static str, &'static str, &'static str) {
     match id {
         "GAS" => (
@@ -3630,7 +3840,7 @@ fn economic_ledger(m: &Model) -> Result<String> {
                                 format!("{rc:.2}"),
                                 t(LEVELS[rung]),
                                 t(id),
-                                t(line),
+                                ledger_line_text(m, b.c.src, id, line),
                                 num(v),
                                 num(lo_l[i].2),
                                 num(hi_l[i].2),
@@ -3802,6 +4012,8 @@ struct SubsidyRow<'a> {
     eval: &'a SubsidyEval,
     /// The method's quantities; `None` on a row for both methods together.
     cells: Option<&'a MethodEval>,
+    /// Source text of the row.
+    source: &'a str,
 }
 
 fn subsidy_row(c: &mut Csv, r: &SubsidyRow<'_>) {
@@ -3849,7 +4061,7 @@ fn subsidy_row(c: &mut Csv, r: &SubsidyRow<'_>) {
             String::new()
         },
         t("calculated"),
-        t(SUBSIDY_SOURCE),
+        t(r.source),
         t("primary"),
         t(r.equation),
         t(STATUS),
@@ -3922,6 +4134,18 @@ fn subsidy_scenarios(m: &Model) -> Result<String> {
     let a = m.emissions(&b.c, b.s).a_net;
     let charged = crate::charged(m, run.case, &b);
     let sp = &m.subsidy;
+    // The independent basis divides by the abatement against the generic
+    // reference intensity (decision D2); the row says so and points to the cost
+    // under the plant-built floor.
+    let source = if m.carbon_params.independent() {
+        format!(
+            "{SUBSIDY_SOURCE}; abatement against the generic reference intensity (central), \
+             with the cost and break-even shares under the plant-built floor in \
+             Final_Design_Basis.csv"
+        )
+    } else {
+        SUBSIDY_SOURCE.to_string()
+    };
     for stage in Stage::ALL {
         for life in [m.lives[0], m.lives[2]] {
             let q = CostQuery::central(stage, life, m.n_linear, charged);
@@ -3958,6 +4182,7 @@ fn subsidy_scenarios(m: &Model) -> Result<String> {
                                 equation,
                                 eval,
                                 cells,
+                                source: &source,
                             },
                         );
                     };

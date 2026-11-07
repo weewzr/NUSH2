@@ -60,6 +60,15 @@ pub struct CostQuery {
     /// independent basis, INL's conventional-plant gas on the legacy one. A value
     /// here is a comparison (the L5 and DCF under INL's gas, for example).
     pub ng_smr: Option<f64>,
+    /// Whether the LOST_STEAM and BASE_POWER lines are priced. They price the
+    /// steam export and the purchased power of INL's conventional plant,
+    /// scaled to this plant (`EXPORT_STEAM_CONV` and `E_CONV_NOCC`, TEV-953
+    /// Table 2): a comparison input, because no source gives the steam duty
+    /// or the power of a plant-built reference. `true` is the ladder as
+    /// committed. `false` sets the reference's export steam equal to the
+    /// plant's and its purchased power to zero, so both lines vanish from the
+    /// ledger and from the cash flow (the cost without the two lines).
+    pub system_lines: bool,
     pub capt_k: Option<f64>,
     pub fom: Option<f64>,
     pub rx_mult: f64,
@@ -83,6 +92,7 @@ impl CostQuery {
             export_rev: 0.0,
             ng_override: None,
             ng_smr: None,
+            system_lines: true,
             capt_k: None,
             fom: None,
             rx_mult: 1.0,
@@ -296,6 +306,18 @@ impl Model {
             None => self.reference_gas_mmscfd(&c, s)?,
         };
         let ng_plant = q.ng_override.unwrap_or(c.ng) * s;
+        // Steam export and purchased power of the unabated reference. With the
+        // system lines switched off the reference exports what the plant
+        // exports and buys no power, so LOST_STEAM and BASE_POWER are zero.
+        let steam_plant_mm = b.export_kept + mw_to_mmbtu_h(b.tg_surplus);
+        let (steam_smr_mm, smr_power_y) = if q.system_lines {
+            (
+                self.export_conv * h_s,
+                self.e_conv * h_s * self.hours * self.price_e / 1e3,
+            )
+        } else {
+            (steam_plant_mm, 0.0)
+        };
 
         let cap_rx = self.reactor_capex(r_charged, lv, q.stage, q.n) * q.rx_mult;
         let (capture_capital, capture_fom_y, capture_allin_y) = match q.capture_mode {
@@ -346,10 +368,10 @@ impl Model {
             power_island_capital: self.ecs_kwe * b.e_total * 1e3 / 1e6 * self.f2019 * stage_power,
             recycle_capital,
             recycle_fom_y: recycle_capital * self.fom.central,
-            steam_smr_mm: self.export_conv * h_s,
-            steam_plant_mm: b.export_kept + mw_to_mmbtu_h(b.tg_surplus),
+            steam_smr_mm,
+            steam_plant_mm,
             steam_s_m_per_mm: MMBTU_GJ * self.hours * gp / 1e6,
-            smr_power_y: self.e_conv * h_s * self.hours * self.price_e / 1e3,
+            smr_power_y,
             export_revenue_y: q.export_rev,
             annual_captured_t: annual_cap,
         })

@@ -569,6 +569,23 @@ pub struct BaselineRow {
     pub reduction: f64,
 }
 
+/// The plant-built unabated reference of equations N.7.1 and N.7.3 without
+/// firing gas, as a cost comparison. It is a floor: the furnace of a real
+/// reference burns extra gas (open issue 2 of the derivation), so its gas and
+/// its emission are the lowest the plant's own balance supports. The central
+/// result stays on the generic reference intensity (decision D2); this is the
+/// other end of the range, printed beside it.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct FloorReference {
+    /// Process gas of the reference at this plant's hydrogen, MMSCFD at the
+    /// case scale.
+    pub gas_mmscfd: f64,
+    /// Net abatement against it, after transport and storage, t/y.
+    pub a_net: f64,
+    /// Its emission intensity, kg CO2 per kg H2.
+    pub kg_kg: f64,
+}
+
 /// Annual quantities of the independent basis for one balance (N.5 to N.10).
 #[derive(Debug, Clone, Serialize)]
 pub struct Abatement {
@@ -852,6 +869,29 @@ impl Model {
         let cbar = ng_carbon_per_mol();
         let mmscfd_per_kmol_h = 1.0 / mmscfd_to_kmol_h(1.0);
         Ok(self.reference_carbon(c, s)? / cbar * mmscfd_per_kmol_h * s)
+    }
+
+    /// The plant-built reference at this balance's hydrogen, for the cost
+    /// comparison under it: the gas to price (`CostQuery::ng_smr`) and the net
+    /// abatement to divide by. `None` on the anchored carbon, which has no
+    /// plant ledger.
+    ///
+    /// eq: N.7.1
+    /// eq: N.7.3
+    pub fn floor_reference(&self, b: &Balance, s: f64) -> Result<Option<FloorReference>> {
+        if b.c.src != CarbonSrc::Plant {
+            return Ok(None);
+        }
+        let ab = self.abatement(b, s)?;
+        let row = ab.rows.iter().find(|r| r.id == "PLANT_FLOOR");
+        Ok(match (row, ab.floor_gas_mmscfd) {
+            (Some(r), Some(gas)) => Some(FloorReference {
+                gas_mmscfd: gas,
+                a_net: r.a_net,
+                kg_kg: r.kg_kg_ref,
+            }),
+            _ => None,
+        })
     }
 
     /// Annual quantities of the balance: captured, stack and condensate CO2,

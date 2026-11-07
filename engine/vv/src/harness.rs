@@ -17,6 +17,7 @@ use nush2_plant::export::{dcf_grid, n_tag, tables, RUNS};
 use nush2_plant::flowsheet::{self, Check};
 use nush2_plant::gates::{GateState, Rows, GATES};
 use nush2_plant::params::ParamSet;
+use nush2_plant::subsidy::Definition;
 use nush2_props::units::kmol_h_to_t_h;
 use nush2_units::stream::Evidence;
 
@@ -602,6 +603,113 @@ pub fn independent_rows_on(p: &ParamSet) -> Result<Vec<Row>> {
             SAME,
             cost_note,
         ));
+        // The cost under the plant-built reference (a floor: the same flowsheet
+        // without capture, recycle or firing gas), printed beside the default,
+        // which divides by the abatement against the generic reference
+        // intensity (decision D2). The break-even shares are the ones that
+        // meet the target under both methods, definitions A and B, default
+        // timing.
+        if let Some(fl) = m.floor_reference(&b, s)? {
+            let qf = CostQuery {
+                ng_smr: Some(fl.gas_mmscfd),
+                ..q
+            };
+            let floor_cond = "B_REC_F, BOAK, 25 y, linear exponent, rated reactor charged, base registry; the literature column holds the value under the plant-built reference (a floor, no firing gas: its gas is priced and its abatement divides the cost), the simulated column the default under the generic reference intensity";
+            let floor_note = "Reported only, no limit. The generic reference intensity includes the firing gas of a real reference furnace, for which the repository holds no sourced efficiency or steam duty; the plant-built reference leaves it out and so is a floor of the abatement. Read the headline verdict together with this row (decision D2 awaits the owner's acceptance)";
+            rows.push(ind_row(
+                "IND_L5_UNDER_PLANT_FLOOR",
+                "Abatement cost at L5, generic reference intensity against the plant-built floor",
+                src,
+                "equations N.7.1, N.7.3 and L.26",
+                floor_cond,
+                Some(m.ledger(&b, &qf)?.l5() * 1e6 / fl.a_net),
+                led.l5() * 1e6 / e.a_net,
+                "S$/t",
+                None,
+                SAME,
+                floor_note,
+            ));
+            rows.push(ind_row(
+                "IND_LAC_DCF_UNDER_PLANT_FLOOR",
+                "Abatement cost of the discounted cash flow, generic reference intensity against the plant-built floor",
+                src,
+                "equations N.7.1, N.7.3 and L.36",
+                floor_cond,
+                Some(m.dcf_at(&b, &qf, fl.a_net)?.lac),
+                m.dcf(&b, &q)?.lac,
+                "S$/t",
+                None,
+                SAME,
+                floor_note,
+            ));
+            let timing = m.subsidy.default_timing;
+            for definition in Definition::ALL {
+                let share_of = |query: &CostQuery, a: f64| -> Result<f64> {
+                    Ok(m.breakeven(&b, query, definition, timing, a)?
+                        .both
+                        .share()
+                        .unwrap_or(f64::NAN))
+                };
+                rows.push(ind_row(
+                    match definition {
+                        Definition::A => "IND_BREAKEVEN_A_UNDER_PLANT_FLOOR",
+                        Definition::B => "IND_BREAKEVEN_B_UNDER_PLANT_FLOOR",
+                    },
+                    &format!(
+                        "Break-even grant share of definition {}, both methods, generic reference intensity against the plant-built floor",
+                        definition.id()
+                    ),
+                    src,
+                    "equations S.7e, N.7.1 and N.7.3",
+                    floor_cond,
+                    Some(share_of(&qf, fl.a_net)?),
+                    share_of(&q, e.a_net)?,
+                    "-",
+                    None,
+                    SAME,
+                    &format!(
+                        "{floor_note}. An empty cell means that no share up to the maximum meets the target"
+                    ),
+                ));
+            }
+        }
+        // The cost without the LOST_STEAM and BASE_POWER lines. Both price
+        // INL's conventional plant (TEV-953 Table 2), scaled, because no source
+        // gives the steam duty or the power of a plant-built reference.
+        {
+            let q_ns = CostQuery {
+                system_lines: false,
+                ..q
+            };
+            let sys_cond = "B_REC_F, BOAK, 25 y, linear exponent, rated reactor charged, base registry; the literature column holds the value without the two lines, the simulated column the default";
+            let sys_note = "Reported only, no limit. LOST_STEAM and BASE_POWER price the steam export and the purchased power of INL's conventional plant (EXPORT_STEAM_CONV and E_CONV_NOCC), scaled to the plant. They are comparison inputs: no source gives the steam duty or the power of a plant-built reference, and their carbon lies outside the direct boundary (open issue 3 of the derivation)";
+            rows.push(ind_row(
+                "IND_L5_WITHOUT_SYSTEM_LINES",
+                "Abatement cost at L5, with and without the LOST_STEAM and BASE_POWER lines",
+                src,
+                "equations L.24 and N.7.4",
+                sys_cond,
+                Some(m.ledger(&b, &q_ns)?.l5() * 1e6 / e.a_net),
+                led.l5() * 1e6 / e.a_net,
+                "S$/t",
+                None,
+                SAME,
+                sys_note,
+            ));
+            rows.push(ind_row(
+                "IND_LAC_DCF_WITHOUT_SYSTEM_LINES",
+                "Abatement cost of the discounted cash flow, with and without the LOST_STEAM and BASE_POWER lines",
+                src,
+                "equations L.24 and N.7.4",
+                sys_cond,
+                Some(m.dcf(&b, &q_ns)?.lac),
+                m.dcf(&b, &q)?.lac,
+                "S$/t",
+                None,
+                SAME,
+                sys_note,
+            ));
+        }
         if let Some(floor_gas) = ab.floor_gas_mmscfd {
             rows.push(ind_row(
                 "IND_REF_GAS_FLOOR_VS_INL_HTGR",

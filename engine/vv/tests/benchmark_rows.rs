@@ -219,3 +219,47 @@ fn fixtures_hold_only_read_values() {
     }
     assert!(bad.is_empty(), "{bad:#?}");
 }
+
+/// The rows printed beside the independent headline: the cost under the
+/// plant-built floor and without the two system lines. They are reported with
+/// no limit, the floor costs more than the default and the cost without the
+/// two lines costs less (fix round 2, findings 1 and 2).
+#[test]
+fn the_floor_and_system_line_rows_are_reported_beside_the_independent_headline() {
+    use nush2_plant::params::ParamSet;
+    let rows = nush2_vv::harness::independent_rows_on(&ParamSet::embedded().unwrap()).unwrap();
+    for id in [
+        "IND_L5_UNDER_PLANT_FLOOR",
+        "IND_LAC_DCF_UNDER_PLANT_FLOOR",
+        "IND_BREAKEVEN_A_UNDER_PLANT_FLOOR",
+        "IND_BREAKEVEN_B_UNDER_PLANT_FLOOR",
+        "IND_L5_WITHOUT_SYSTEM_LINES",
+        "IND_LAC_DCF_WITHOUT_SYSTEM_LINES",
+    ] {
+        let r = find(&rows, id);
+        assert_eq!(r.status, Status::Reported, "{id}");
+        assert!(r.tolerance.is_none(), "{id}");
+    }
+    for id in ["IND_L5_UNDER_PLANT_FLOOR", "IND_LAC_DCF_UNDER_PLANT_FLOOR"] {
+        let r = find(&rows, id);
+        let floor = r.literature.expect(id);
+        assert!(floor > r.simulated, "{id}: {floor} {}", r.simulated);
+        assert!(r.explanation.contains("floor"), "{id}");
+    }
+    for id in [
+        "IND_L5_WITHOUT_SYSTEM_LINES",
+        "IND_LAC_DCF_WITHOUT_SYSTEM_LINES",
+    ] {
+        let r = find(&rows, id);
+        let without = r.literature.expect(id);
+        assert!(without < r.simulated, "{id}: {without} {}", r.simulated);
+        assert!(r.explanation.contains("comparison inputs"), "{id}");
+    }
+    // The default break-even shares are the ones the co-funding table prints;
+    // under the floor the share of definition B is larger.
+    let b = find(&rows, "IND_BREAKEVEN_B_UNDER_PLANT_FLOOR");
+    assert!(b.literature.expect("B reachable under the floor") > b.simulated);
+    // Definition A does not reach the target under the floor: the cell is empty.
+    let a = find(&rows, "IND_BREAKEVEN_A_UNDER_PLANT_FLOOR");
+    assert!(a.literature.is_none_or(|x| !x.is_finite()));
+}
