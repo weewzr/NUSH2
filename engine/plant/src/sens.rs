@@ -163,6 +163,19 @@ enum Baseline {
     Ieaghg,
 }
 
+impl Baseline {
+    /// The `CARBON_BASELINE` switch value that selects this reference on the
+    /// independent basis, `None` for the central one.
+    fn switch(self) -> Option<f64> {
+        match self {
+            Baseline::Central => None,
+            Baseline::Ieaghg => Some(0.0),
+            Baseline::Inl => Some(1.0),
+            Baseline::Cho => Some(2.0),
+        }
+    }
+}
+
 fn no_tweak(_: &Model, _: &mut BalanceOpts) {}
 
 const CENTRAL: Point<'static> = Point {
@@ -210,25 +223,31 @@ fn solve(base: &ParamSet, pt: Point<'_>) -> Result<Solved> {
     for (id, v) in pt.params {
         p.set(id, *v)?;
     }
-    let m = Model::new(&p)?;
+    let mut m = Model::new(&p)?;
     let s = m.s_b;
     let mut o = m.opts(s);
     (pt.tweak)(&m, &mut o);
     let mut b = m.plant_balance(pt.scn, &o)?;
     adjust(&m, &mut b, pt.adj);
+    // On the plant ledger a point that changes the baseline selects it through
+    // `CARBON_BASELINE`, so the reference gas of the cost follows the reference
+    // intensity of the carbon (rule 1 of the boundary table of N.7). Shifting
+    // the abatement alone would leave the GAS line on the central gas.
+    if b.c.src == CarbonSrc::Plant {
+        if let Some(v) = pt.baseline.switch() {
+            p.set("CARBON_BASELINE", v)?;
+            m = Model::new(&p)?;
+        }
+    }
     let h2 = m.h2_a_kgh * s * b.c.h_scale * m.hours / 1000.0;
-    // Offsets are differences to the reference the basis centres on.
-    let central_kg = match b.c.src {
-        CarbonSrc::Plant => m.baseline_kg_kg(m.carbon_params.baseline),
-        CarbonSrc::Anchored => m.base_inl,
+    // Anchored carbon only: the offset to INL, the reference of that basis, as
+    // committed at 8750b09. INL is the central one there, so its offset is zero.
+    let offset = match (b.c.src, pt.baseline) {
+        (CarbonSrc::Anchored, Baseline::Cho) => (m.base_cho - m.base_inl) * h2,
+        (CarbonSrc::Anchored, Baseline::Ieaghg) => (m.base_ieaghg - m.base_inl) * h2,
+        _ => 0.0,
     };
-    let a = m.emissions(&b.c, s).a_net
-        + match pt.baseline {
-            Baseline::Central => 0.0,
-            Baseline::Inl => (m.base_inl - central_kg) * h2,
-            Baseline::Cho => (m.base_cho - central_kg) * h2,
-            Baseline::Ieaghg => (m.base_ieaghg - central_kg) * h2,
-        };
+    let a = m.emissions(&b.c, s).a_net + offset;
     let r = if pt.r_at_need { b.r } else { m.r_rated };
     let n = pt.n.unwrap_or(m.n_linear);
     Ok(Solved { m, b, a, r, n })
@@ -933,6 +952,14 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
             ..CENTRAL
         },
     );
+    // The central reference intensity of the basis, the value the group's test
+    // values are measured from: the one `CARBON_BASELINE` names on the
+    // independent basis, INL's on the legacy one.
+    let central_kg = if m.carbon_params.independent() {
+        m.baseline_kg_kg(m.carbon_params.baseline)
+    } else {
+        m.base_inl
+    };
     for (id, value, baseline) in [
         ("BASE_INL", m.base_inl, Baseline::Inl),
         ("BASE_CHO", m.base_cho, Baseline::Cho),
@@ -944,7 +971,7 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
         };
         let run = format!("B_REC_F_{id}");
         w.push(
-            lab("BASELINE", &run, "Baseline", "kg/kg", m.base_inl, value),
+            lab("BASELINE", &run, "Baseline", "kg/kg", central_kg, value),
             pt,
         );
     }
@@ -1649,4 +1676,142 @@ pub fn cofunding_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
         }
     }
     Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::abatement::BaselineKind;
+
+    fn rel(a: f64, b: f64) -> f64 {
+        (a - b).abs() / b.abs().max(1e-300)
+    }
+
+    /// Rule 1 of the boundary table of N.7 at every sensitivity point that
+    /// changes the baseline: the points of the BASELINE group and of the
+    /// CARBON_BASELINE group. The model of the point carries the baseline it
+    /// names, the GAS line of its cost reads the reference gas that baseline
+    /// implies (the gas of the decomposition of N.9.2), and the abatement it
+    /// divides by is the net abatement against that baseline.
+    #[test]
+    fn rule_1_of_n_7_holds_at_every_sensitivity_point_that_changes_the_baseline() {
+        let base = ParamSet::embedded().unwrap();
+        let by_group: [(&str, Point<'_>, BaselineKind); 6] = [
+            (
+                "BASELINE IEAGHG",
+                Point {
+                    baseline: Baseline::Ieaghg,
+                    ..CENTRAL
+                },
+                BaselineKind::Ieaghg,
+            ),
+            (
+                "BASELINE INL",
+                Point {
+                    baseline: Baseline::Inl,
+                    ..CENTRAL
+                },
+                BaselineKind::Inl,
+            ),
+            (
+                "BASELINE Cho",
+                Point {
+                    baseline: Baseline::Cho,
+                    ..CENTRAL
+                },
+                BaselineKind::Cho,
+            ),
+            (
+                "CARBON_BASELINE 0",
+                Point {
+                    params: &[("CARBON_BASELINE", 0.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Ieaghg,
+            ),
+            (
+                "CARBON_BASELINE 1",
+                Point {
+                    params: &[("CARBON_BASELINE", 1.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Inl,
+            ),
+            (
+                "CARBON_BASELINE 2",
+                Point {
+                    params: &[("CARBON_BASELINE", 2.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Cho,
+            ),
+        ];
+        let mut gas = Vec::new();
+        for (name, pt, kind) in by_group {
+            let sv = solve(&base, pt).unwrap();
+            let s = sv.m.s_b;
+            assert_eq!(sv.m.carbon_params.baseline, kind, "{name}");
+            let q = query(&pt, sv.m.lives[0], sv.n, sv.r);
+            let k = sv.m.cost_items(&sv.b, &q).unwrap();
+            let ab = sv.m.abatement(&sv.b, s).unwrap();
+            let d = ab.decomposition.unwrap();
+            // The GAS line prices the gas of the decomposition, the gas that
+            // this baseline implies.
+            assert!(rel(k.ng_smr, d.n_ref_mmscfd) < 1e-12, "{name}");
+            let led = sv.m.ledger(&sv.b, &q).unwrap();
+            let diff = -led.gas / k.gas_s_m_per_mmscfd;
+            assert!(rel(diff, d.n_ref_mmscfd - k.ng_plant) < 1e-12, "{name}");
+            // The abatement of the point is the net abatement against it, with
+            // no offset on the abatement alone.
+            let row = ab.rows.iter().find(|r| r.id == kind.id()).unwrap();
+            assert!(
+                rel(sv.a, row.a_net) < 1e-12,
+                "{name}: {} {}",
+                sv.a,
+                row.a_net
+            );
+            // The decomposition adds up to the direct abatement against it.
+            assert!(rel(d.total, row.a_direct) < 1e-9, "{name}");
+            gas.push((kind, k.ng_smr));
+        }
+        // A higher baseline implies more reference gas, so a point that moved
+        // the abatement alone would have left these three equal.
+        let of = |kind: BaselineKind| gas.iter().find(|g| g.0 == kind).unwrap().1;
+        assert!(of(BaselineKind::Ieaghg) < of(BaselineKind::Inl));
+        assert!(of(BaselineKind::Inl) < of(BaselineKind::Cho));
+        // The two groups agree to the last digit, point by point.
+        for i in 0..3 {
+            assert_eq!(gas[i].0, gas[i + 3].0);
+            assert_eq!(gas[i].1.to_bits(), gas[i + 3].1.to_bits(), "{i}");
+        }
+    }
+
+    /// On the legacy basis a baseline point keeps the offset of the abatement
+    /// that was committed at 8750b09: INL is the central reference there and
+    /// has none.
+    #[test]
+    fn legacy_baseline_points_keep_the_committed_offsets() {
+        let mut base = ParamSet::embedded().unwrap();
+        base.set("CARBON_BASIS", 0.0).unwrap();
+        let central = solve(&base, CENTRAL).unwrap();
+        let inl = solve(
+            &base,
+            Point {
+                baseline: Baseline::Inl,
+                ..CENTRAL
+            },
+        )
+        .unwrap();
+        assert_eq!(central.a.to_bits(), inl.a.to_bits());
+        let cho = solve(
+            &base,
+            Point {
+                baseline: Baseline::Cho,
+                ..CENTRAL
+            },
+        )
+        .unwrap();
+        let h2 = cho.m.h2_a_kgh * cho.m.s_b * cho.b.c.h_scale * cho.m.hours / 1000.0;
+        assert!(rel(cho.a - central.a, (cho.m.base_cho - cho.m.base_inl) * h2) < 1e-12);
+    }
 }
