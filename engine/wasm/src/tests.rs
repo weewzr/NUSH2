@@ -1322,3 +1322,22 @@ fn island_duties_follow_the_design_point() {
         assert!(r["profiles"]["stripper"].is_null());
     }
 }
+
+/// The headline abatement and cost indicators carry the wording that ties them
+/// to a generic reference intensity (decision D2), and keep their ids.
+#[test]
+fn headline_indicator_labels_name_the_generic_reference_intensity() {
+    for id in [
+        "abatement_t_y",
+        "abatement_direct_t_y",
+        "cost_s_per_t",
+        "cost_l3_s_per_t",
+        "cost_lac_dcf_s_per_t",
+    ] {
+        let (_, label, _) = KPIS.iter().find(|k| k.0 == id).expect(id);
+        assert!(
+            label.contains("generic reference intensity"),
+            "{id}: {label}"
+        );
+    }
+}

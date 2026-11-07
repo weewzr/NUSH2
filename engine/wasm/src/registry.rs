@@ -855,7 +855,7 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ("e_aux_mwe", "Auxiliary electricity", "MWe"),
     (
         "abatement_t_y",
-        "Annual abatement, net of transport and storage, central reference",
+        "Annual abatement, net of transport and storage, against the central reference (a generic reference intensity on the independent basis)",
         "t/y",
     ),
     ("abatement_cho_t_y", "Annual abatement, Cho baseline", "t/y"),
@@ -876,17 +876,17 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ),
     (
         "cost_s_per_t",
-        "Abatement cost, L5 ledger, selected stage, life and exponent",
+        "Abatement cost, L5 ledger, selected stage, life and exponent, per tonne against the central reference (a generic reference intensity on the independent basis)",
         "S$/t",
     ),
     (
         "cost_l3_s_per_t",
-        "Abatement cost at ladder step L3",
+        "Abatement cost at ladder step L3, per tonne against the central reference (a generic reference intensity on the independent basis)",
         "S$/t",
     ),
     (
         "cost_lac_dcf_s_per_t",
-        "Levelised abatement cost, discounted cash flow",
+        "Levelised abatement cost, discounted cash flow, per tonne against the central reference (a generic reference intensity on the independent basis)",
         "S$/t",
     ),
     ("lcoh_nush2_s_per_kg", "LCOH of NUS-H2", "S$/kg"),
@@ -898,7 +898,7 @@ pub const KPIS: &[(&str, &str, &str)] = &[
     ("co2_ts_t_y", "CO2 emitted by transport and storage", "t/y"),
     (
         "abatement_direct_t_y",
-        "Annual direct abatement, before transport and storage",
+        "Annual direct abatement, before transport and storage, against the central reference (a generic reference intensity on the independent basis)",
         "t/y",
     ),
     (
