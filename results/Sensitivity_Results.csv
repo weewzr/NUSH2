@@ -65,36 +65,36 @@ BACKUP_FIRING,B_REC_F_HEATER_K20,Backup route over the outage hours,index,0.0000
 BACKUP_FIRING,B_REC_F_HEATER_K20,Backup route over the outage hours,index,0.000000,3.000000,A_T_Y,623084.243941,65316.828425,calculated,"backup firing is a sensitivity only; furnace and heater capital are unpriced, so no cost metric; route 3 fires process heat only, card K.20",anchored_port
 BACKUP_FIRING,B_REC_F_HEATER_K20,Backup route over the outage hours,index,0.000000,3.000000,EMIT_BACKUP_T_Y,43452.693299,43452.693299,calculated,"backup firing is a sensitivity only; furnace and heater capital are unpriced, so no cost metric; route 3 fires process heat only, card K.20",anchored_port
 BACKUP_FIRING,B_REC_F_HEATER_K20,Backup route over the outage hours,index,0.000000,3.000000,H2_EXTRA_T_Y,11810.232000,11810.232000,calculated,"backup firing is a sensitivity only; furnace and heater capital are unpriced, so no cost metric; route 3 fires process heat only, card K.20",anchored_port
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,AC_L3_25,143.152637,-6.080494,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,AC_L3_60,122.820123,-5.216858,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,AC_L5_25,194.901764,-8.278569,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,AC_L5_60,170.933730,-7.260512,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,A_T_Y,581458.919493,23691.503977,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,LAC_DCF_25,195.209273,-8.291630,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,LAC_DCF_60,171.264825,-7.274576,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,9.209770,9.350000,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,AC_L3_25,149.233131,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,AC_L3_60,128.036981,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,AC_L5_25,203.180333,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,AC_L5_60,178.194242,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,A_T_Y,557767.415516,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,LAC_DCF_25,203.500904,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,LAC_DCF_60,178.539401,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,9.209770,8.995997,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,AC_L3_25,145.501046,-3.732085,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,AC_L3_60,124.834978,-3.202002,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,AC_L5_25,198.099114,-5.081219,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,AC_L5_60,173.737886,-4.456356,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,A_T_Y,572074.083796,14306.668280,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,LAC_DCF_25,198.411668,-5.089236,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,LAC_DCF_60,174.074413,-4.464988,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
-BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,9.209770,9.209770,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,AC_L3_25,131.008270,-18.224861,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,AC_L3_60,110.675756,-17.361225,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,AC_L5_25,182.757397,-20.422936,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,AC_L5_60,158.789363,-19.404879,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,A_T_Y,581458.919493,23691.503977,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,LAC_DCF_25,183.064906,-20.435998,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,LAC_DCF_60,159.120458,-19.418943,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_CHO,Baseline,kg/kg,8.995997,9.350000,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,AC_L3_25,149.233131,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,AC_L3_60,128.036981,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,AC_L5_25,203.180333,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,AC_L5_60,178.194242,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,A_T_Y,557767.415516,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,LAC_DCF_25,203.500904,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,LAC_DCF_60,178.539401,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_IEAGHG,Baseline,kg/kg,8.995997,8.995997,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,AC_L3_25,138.047078,-11.186053,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,AC_L3_60,117.381010,-10.655971,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,AC_L5_25,190.645146,-12.535187,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,AC_L5_60,166.283918,-11.910324,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,A_T_Y,572074.083796,14306.668280,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,LAC_DCF_25,190.957700,-12.543204,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,LAC_DCF_60,166.620445,-11.918956,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,MARGIN_210,31.506136,0.000000,calculated,a corner run carries no probability,gated_T05
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,NG_MMSCFD,23.098553,0.000000,calculated,a corner run carries no probability,anchored_port
+BASELINE,B_REC_F_BASE_INL,Baseline,kg/kg,8.995997,9.209770,R_NEEDED,178.493864,0.000000,calculated,a corner run carries no probability,gated_T05
 CAPTURE,B_REC_F,Per-pass capture,-,0.900000,0.800000,AC_L3_25,148.350491,-0.882640,calculated,a corner run carries no probability,anchored_port
 CAPTURE,B_REC_F,Per-pass capture,-,0.900000,0.850000,AC_L3_25,148.778066,-0.455065,calculated,a corner run carries no probability,anchored_port
 CAPTURE,B_REC_F,Per-pass capture,-,0.900000,0.900000,AC_L3_25,149.233131,0.000000,calculated,a corner run carries no probability,anchored_port
