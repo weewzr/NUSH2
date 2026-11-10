@@ -30,3 +30,7 @@ No engineering change. The implementation is the job of the future session.
 ## raystorage
 
 `RAYSTORAGE_INTEGRATION.md` and `RAYSTORAGE_FILE_INDEX.md` map the public archive weewzr/raystorage (pinned commit `3a25c4a7`) to the tasks. Read the privacy findings in section 3 of the integration file before opening any archived file.
+
+## Source briefs
+
+`ORIGINAL_BRIEF_1_COMPLETION_SPECIFICATION.md` and `ORIGINAL_BRIEF_2_RAYSTORAGE_UPDATE.md` hold the owner's two instructions this package answers. Check the package against them.
