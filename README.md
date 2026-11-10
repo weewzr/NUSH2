@@ -107,6 +107,8 @@ python scripts/selftest.py --site _site
 python -m http.server --directory _site 8000                # then open http://localhost:8000/
 ```
 
+The browser self test also checks that every unit on the process flow diagram has an accessible name containing its printed label, that scrolling tables and equations take keyboard focus, and that the equipment and stream list selects the same item as the drawing. The interface review, including the evaluation of the Astryx component library (no component adopted) and its measurements, is in section 8 of `docs/UI_UX_ASSESSMENT.md`.
+
 ## Derivations
 
 `math/NUSH2_First_Principles_Derivations.pdf` derives each equation the engine uses. It opens with a Reference Frame of the variables, equations and assumptions, and every card links to its engine item and test through `math/eq_register.csv`. Worked numbers enter it only through `scripts/derivations_tools.py values`, which reads the results files and `build/numbers_tokens.csv`. The build order is in the docstring of `scripts/derivations_tools.py`; the Tectonic step runs in `math/`:

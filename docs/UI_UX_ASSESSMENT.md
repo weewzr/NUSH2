@@ -2,7 +2,7 @@
 
 Author: Wee Zhern Ray. Licence: MIT, as the rest of the repository.
 
-This document covers the interface work on the browser simulator. It holds the assessment of the existing site, the review of three candidate component libraries, the integration strategy that follows from it, the design of the guided process tour on the Interactive PFD page (built in this stage), a plan for the rest of the interface brief, and the record of the checks that ran.
+This document covers the interface work on the browser simulator. It holds the assessment of the existing site, the review of three candidate component libraries, the integration strategy that follows from it, the design of the guided process tour on the Interactive PFD page (built in this stage), a plan for the rest of the interface brief, and the record of the checks that ran. Section 8 adds the evaluation of the Astryx component library and an accessibility pass on the Interactive PFD page.
 
 The tour came first because it was asked for first: a button outside the drawing that walks through the plant, from fission heat in the reactor core through the helium loops, the reformer train and capture, to the hydrogen product at one end and CO2 storage at the other.
 
@@ -233,3 +233,126 @@ Only checks that ran are listed, all on the frontend this revision commits. The 
 - Checks of earlier rounds on parts this change leaves alone were not run again here: the screenshots, the close-ups, the read-through of every caption at seven input sets and the contrast measure. This round changes how the tour scrolls, and no visible text or colour.
 - The dark theme, the camera, zoom and the other phases of section 6 are not built yet.
 - Drawing questions left open: whether to redraw the reformer's helium connections as counterflow and the PSA beds with their real nozzles, whether to draw the secondary circulator, the heat lines into the reboiler and the burner, and whether the drawing's own labels (the power block's output, the reformer's process heat) should read the delivered values on an infeasible plant. The tour names each simplification on screen in the meantime.
+
+## 8. Astryx evaluation and accessibility pass
+
+Recorded 2026-11-10 on branch `feat/astryx-nush2`, which starts at `8750b09`. Astryx is Meta's React component library (MIT, beta; `@astryxdesign/core` 0.7.11 with `@astryxdesign/theme-neutral` 0.7.11). The question was whether any part of this site gains from it. The answer is that no component does, so none is adopted. The audit did find two serious axe rules failing. This section records how they were fixed with the existing stack, together with one addition to the Interactive PFD page: an equipment and stream list.
+
+### 8.1 Original architecture, in brief
+
+Section 1 still describes the site: static HTML, CSS and ES modules, no framework, bundler or `package.json`, no Node in the repository or in CI, the engine in a Web Worker as an import-free WebAssembly module, and one mutable `state` object whose views re-render with `innerHTML` on every engine reply. Two properties matter for this section. Views are rebuilt from the reply, so a React root mounted inside a view would be unmounted on the next solve. And `site.yml` has no `setup-node` step, so a bundle would have to be committed or the workflow extended.
+
+### 8.2 Proof of concept and measurements
+
+The proof of concept was built outside the repository, in a scratch folder, with esbuild 0.28.2, React and React DOM 19.3.1, `@astryxdesign/core` 0.7.11, the neutral theme 0.7.11 and StyleX 0.19.0, using per-component subpath imports. Three entries were bundled and loaded in headless Edge at 1440 by 900 from a local server. Entry R is React DOM alone. Entry A is one `Theme`, `Tooltip` and `Button`, the weight of a single stream tag with a tooltip. Entry B is `Theme` with `SegmentedControl`, `Selector`, `Tooltip`, `Dialog`, `TabList`, `Card` and `Button`.
+
+| Entry | JS, bytes | JS, gzip | Mount time, median of 5 loads (range) | axe violations |
+|---|---|---|---|---|
+| R, React DOM only | 223,497 | 69,069 | not measured | not measured |
+| A, tooltip and button | 487,056 | 153,570 | 117.6 ms (102.8 to 1680.5) | 0 |
+| B, seven components | 891,555 | 283,543 | 207.8 ms (198.7 to 2428.1) | 0 |
+| Astryx stylesheet, all components, minified | 282,211 | 43,739 | not applicable | not applicable |
+| This site today, all `.js` files | 325,123 | 98,236 | not applicable | not applicable |
+| This site today, all `.css` files | 51,451 | 14,257 | not applicable | not applicable |
+
+Mount time runs from the start of the page script to the first child in the island. In each set the slowest load (1.7 s and 2.4 s) is far from the other four. The cause was not investigated, and the median is the figure to use. Entry A alone adds about 150 percent to the site's JavaScript, and entry B adds about 274 percent. The Astryx stylesheet is about 5.5 times the size of all the site's own CSS, and it has no per-component split.
+
+Other findings from the same build:
+
+- The bundle contains the URL `https://react.dev/errors`, which the host allowlist in `scripts/check_site.py` does not list. The unminified stylesheet contains 11 em dashes.
+- The stylesheet sets `color-scheme: light dark` in several places, and the neutral theme names the Figtree font family. The site is light only by design and uses the system font stack, and `check_site.py` rejects `@font-face` and any outside host.
+- A bundler step needs Node 22 in `site.yml`, a committed or generated bundle, and notices for React, Astryx, StyleX and their dependencies in `THIRD_PARTY_NOTICES.md`.
+
+These figures come from one machine and one browser, with five loads per entry. They show the order of magnitude and the integration friction. They are not a benchmark.
+
+### 8.3 Decision for each area
+
+| Area | Astryx candidate | Decision and reason |
+|---|---|---|
+| Six hash routes | `TabList` | Kept as links with `aria-current`. `TabList` switches panels in place and would hold a second route state beside `location.hash`. |
+| Status line, error banner, stale tag | `Banner`, `StatusDot`, `Badge` | Kept. The live regions are covered by the self test, and a React island would race the plain render. |
+| KPI strip, target verdicts, scenario line | `Card`, `Badge`, `Item` | Kept. Base case and conditional scenario are already separate and are checked by `scenario_control` and `mature_scenario_parity`. |
+| Scenario radio group | `SegmentedControl` | Kept. The radiogroup semantics are the same, the gain is appearance only, and the state would be duplicated. |
+| Parameter controls | `Slider`, `NumberInput`, `Field` | Kept. The engine registry owns ranges, units and sources, and controlled React state would compete with `state.inputs` and the 200 ms debounce. |
+| Interactive PFD, unit buttons | none | Kept and improved (section 8.6). Astryx has no flowsheet component. |
+| Stream tooltips and pinning | `Tooltip`, `HoverCard`, `Popover` | Kept. They anchor to DOM triggers and know nothing of SVG coordinates or the pin and Escape behaviour that the self test checks. |
+| Process tour | `Stepper`, `Card` | Kept. High rewrite risk for no gain, with twelve self-test checks around it. |
+| Unit panels | `Collapsible`, `ScrollableArea` | Kept as native `details` and `summary`. Scrolling boxes improved (section 8.6). |
+| Charts | `charts`, `vega` | Kept. Both are experimental packages, which the brief excludes from scientific interfaces, and every chart already has a table view. |
+| Data tables | `Table`, `Pagination` | Kept as native tables. Scrolling wrappers improved. |
+| Native selects | `Selector` | Kept. Its custom popup is a step back from a native select on phones and with screen readers. |
+| Dialogs | `Dialog`, `AlertDialog` | Not used. The site has no modal. |
+| Export | `Button`, `DropdownMenu` | Kept. The download wiring produces scientific output files. |
+| Layout and responsiveness | `Layout`, `Grid` | Kept. No horizontal overflow was found at 390 px on any route. |
+| Build | an esbuild step | Not added, for the reasons in section 8.2. |
+
+Components adopted: none. Dependencies added: none. `package.json` is still absent and `THIRD_PARTY_NOTICES.md` is unchanged.
+
+### 8.4 Theming
+
+No Astryx theme is loaded. The site keeps its own light-only tokens in `style.css`. The new list and the focus ring on scrolling boxes use those tokens and the existing `:focus-visible` rule, so they look like the rest of the page. Stream colours are still literal values in `pfd.css`, and there is still no dark theme (section 6, phase 3).
+
+### 8.5 What the audit found
+
+axe-core 4.14.0 (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice`) ran on all six routes at 1440 by 900 and at 390 by 844, with and without `prefers-reduced-motion`. That is 24 runs. Ten of them reported violations, 52 node hits in all.
+
+- `label-content-name-mismatch` (serious): nine unit groups on the PFD had an `aria-label` that did not contain the text printed on the drawing (WCAG 2.5.3). 36 node hits.
+- `scrollable-region-focusable` (serious): wide tables on Results and Validation, an equation line in a unit panel and the unit panel column all scrolled but could not take keyboard focus. 16 node hits.
+
+### 8.6 Changes made with the existing stack
+
+| File | Change |
+|---|---|
+| `frontend/a11y.js` | New. Gives a scrolling box (`.table-scroll`, `.eq-body`, `.pfd-side`) `tabindex="0"`, a name taken from its caption or nearest heading and `role="group"` while it overflows, and removes all three when the content fits. A `MutationObserver` and a resize listener keep it current. It reads layout and writes attributes only. |
+| `frontend/app.js` | Loads `a11y.js` apart from the shell, as the PFD module is loaded, so a fault there leaves the page working. |
+| `frontend/pfd.js` | A unit's accessible name starts with the text printed on the drawing when the unit's full name does not already contain it. The names the page first states are kept in a map, so the fallback label no longer parses the `aria-label`. New equipment and stream list (below). |
+| `frontend/index.html` | A `details` block above the drawing for the list. Drawing markup, ids, classes and `data-` attributes are unchanged. |
+| `frontend/pfd.css` | Styles for the list, built from the existing tokens. |
+| `frontend/selftest.js` | Three new checks (section 8.8). |
+
+The list is the non-visual alternative to the drawing. It sits before the drawing, so a keyboard or screen-reader reader meets it before the 50 focus stops of the drawing (20 units and 30 streams). It holds one button for each unit and each stream tag, in the order of `units.json`, and covers the same set as the drawing. A unit button selects the unit exactly as a click on the drawing does: the pressed state on the drawing, the unit picker and the panel all follow. A stream button marks the stream on the drawing and shows the tooltip's text, with the link to its row of the stream table in Results. Every string comes from the engine reply or from `units.json`. The list holds no number of its own, and a stream's values are the precomputed headline rows, labelled as such, as in the tooltip.
+
+### 8.7 Accessibility after the change
+
+The same 24 runs with the same method, a small puppeteer-core and axe-core harness kept outside the repository and run against the built site:
+
+| axe rule | Node hits before | Node hits after |
+|---|---|---|
+| `label-content-name-mismatch` | 36 | 0 |
+| `scrollable-region-focusable` | 16 | 0 |
+| Any other rule | 0 | 0 |
+
+Horizontal overflow was 0 px on every route and viewport, before and after. axe also lists checks it cannot decide (`incomplete`): `color-contrast` on SVG text and gradient backgrounds, `th-has-data-cells`, and `aria-prohibited-attr` on the Parameters route. These were the same before and after, apart from one `scrollable-region-focusable` item on Results at 390 px that no longer appears. They have not been reviewed by hand. The contrast of the tour was measured in section 5.5, and the rest of the site was not.
+
+The self test checks tab stops and names of scrolling boxes on five routes, and the list on the PFD route, at the viewport of each run. Tab order was not recorded with real key events in this round, and no screen reader was used.
+
+### 8.8 Test results
+
+Everything ran on the built site, served from 127.0.0.1, with the module built from the unchanged engine and stamped with the baseline commit. Edge was the only browser. The machine was shared with other work while these ran, so timings are noisy.
+
+| Check | Result |
+|---|---|
+| `scripts/build_site.py` into a scratch folder | built, 33 files, 3,579,556 bytes. The baseline build has 32 files and 3,564,075 bytes. The module is unchanged at 1,067,548 bytes. |
+| Size change against the baseline build | JS 325,123 to 337,964 bytes (gzip 98,236 to 101,982), CSS 51,451 to 53,325 bytes (gzip 14,257 to 14,623), HTML 43,200 to 43,966 bytes. Total gzip 708,181 to 712,493 bytes. |
+| `scripts/selftest.py` at 1440 by 900 | PASS: 36 passed and 1 skipped (`pfd_streams_bound`, skipped as before because the live reply carries no stream table). The baseline run had 33 passed and 1 skipped. 0 browser errors, 0 requests to another host. |
+| The same at 375 by 812 with phone emulation, and with `--reduced-motion` at both sizes | PASS each time, 36 passed and 1 skipped. |
+| Planted fault: the new `selftest.js` run against a copy of the baseline build | FAIL on exactly the three new checks. `unit_names_hold_label` named the nine units that axe also flagged (htgr, circ_primary, ihx, power, smr, wgs, rich_lean_hx, co2_storage, psa), `scroll_boxes_focusable` named an equation line and a validation table, and `pfd_list_selects` found no list. Every earlier check passed. |
+| axe-core 4.14.0, 24 runs | 0 violations after, against 52 node hits in 10 runs before (section 8.7). |
+| `scripts/check_site.py --site <site> --repo .` | PASS: 33 site files and 220 repository files, 0 hits. |
+| The same with `--prove` | PASS: site proof 34 of 34 planted violations caught, repository proof 11 of 11. |
+| `scripts/check_clean.py` | 226 files scanned, 0 hits. |
+| `scripts/check_wasm.py` | PASS, 0 imports. |
+| `cargo test -p nush2_vv --test concept_checks` and `cargo test -p nush2_plant --test no_internal_pointers` | 7 and 2 tests passed. These two tests read the README, `docs/` and `frontend/` text, so they were the Rust tests that this change could affect. |
+| Full `cargo test --workspace`, `cargo fmt --check`, `cargo clippy` | Not run again. No Rust or engine file changed (`git diff main --stat` lists only `frontend/`, `README.md` and `docs/`). The baseline run on `main` passed all 368 tests. |
+| Load time, 5 interleaved loads of each build, `#pfd` route | Page load median 295 ms before and 292 ms after. Time to the first engine result shown: median 2443 ms before (range 1482 to 3307) and 2631 ms after (range 1443 to 3084). The difference is inside the run-to-run spread. |
+| Lighthouse | Not measured. The run on this machine did not finish in about six minutes while other work shared the CPU, and it was stopped. |
+
+### 8.9 Known limitations and future maintenance
+
+- The Parameters, techno-economic and validation displays are unchanged. The audit found that they already carry grouping, units, hard and evidence ranges, source notes, a reset and a MATURE_60Y preset, and that conditional and out-of-evidence results are tagged apart from the base case. Any wording change there belongs to a separate change that the owner reviews, because the text is part of the published record.
+- The list is in process order only. Stage navigation remains the process tour. Grouping the list by plant section would need a stage field in `units.json`.
+- The list shows a stream's description and its precomputed headline values. The live reply carries no stream table, so these values do not follow the controls, and the text says so.
+- `a11y.js` observes the whole body for added nodes and visibility changes and re-measures about thirty boxes at most once per frame. If a later view re-renders very often, the observer can be narrowed to `main`.
+- `selftest.js` is still shipped in the production site, as before.
+- Testing was in Edge only, and Lighthouse was not measured (section 8.8).
+- If Astryx is looked at again, the conditions are a Node step in `site.yml`, notices for every bundled dependency, a narrow change to the host and dash rules, islands placed outside the `innerHTML` mount points, and a per-component stylesheet. The first candidates would be a new modal or a new form, which the site does not have today.
