@@ -237,3 +237,27 @@ body:has(#route-pfd:not([hidden])) .wrap { max-width: 1680px; }
 .vrows li { margin: 3px 0; color: var(--ink-2); font-size: 0.78rem; line-height: 1.4; }
 .vrows code { font-family: var(--mono); font-size: 0.74rem; color: var(--ink); }
 .vrows .vnote { display: block; color: var(--muted); }
+
+/* Equipment and streams as lists: the non-visual route to the same selection */
+.pfd-list { margin: 0 0 12px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--page); }
+.pfd-list > summary { padding: 9px 12px; font-size: 0.9rem; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.pfd-list[open] > summary { border-bottom: 1px solid var(--rule); }
+.pfd-list .pfd-list-note { margin: 10px 12px 0; color: var(--muted); font-size: 0.84rem; max-width: 80ch; }
+.pfd-list h3 { margin: 12px 12px 6px; font-size: 0.92rem; color: var(--title); }
+.pfd-list-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 6px; margin: 0 12px 4px; padding: 0; list-style: none; }
+.pl-btn {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  width: 100%; min-height: 44px; padding: 6px 10px; text-align: left;
+  border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 0.86rem; cursor: pointer;
+}
+.pl-btn:hover { border-color: var(--accent); }
+.pl-btn[aria-pressed="true"] { border-color: var(--title); box-shadow: inset 4px 0 0 var(--title); background: var(--accent-soft); font-weight: 600; }
+.pl-btn .p-tag { color: var(--title); font-weight: 700; margin: 0; }
+.pl-btn .pl-meta { flex-basis: 100%; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+.pfd-list-detail { margin: 10px 12px 12px; font-size: 0.86rem; line-height: 1.45; }
+.pfd-list-detail:empty { display: none; }
+.pfd-list-detail .tip-id { font-weight: 700; color: var(--title); margin-right: 6px; }
+.pfd-list-detail .tip-row { margin-top: 4px; color: var(--ink-2); }
+.pfd-list-detail .tip-na { margin-top: 4px; color: var(--muted); }
+.pfd-list-detail a { display: inline-block; margin-top: 6px; }
