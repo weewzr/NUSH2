@@ -254,6 +254,7 @@ body:has(#route-pfd:not([hidden])) .wrap { max-width: 1680px; }
 .pl-btn:hover { border-color: var(--accent); }
 .pl-btn[aria-pressed="true"] { border-color: var(--title); box-shadow: inset 4px 0 0 var(--title); background: var(--accent-soft); font-weight: 600; }
 .pl-btn .p-tag { color: var(--title); font-weight: 700; margin: 0; }
+.pl-btn .pl-name { flex: 1 1 0; min-width: 0; }
 .pl-btn .pl-meta { flex-basis: 100%; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
 .pfd-list-detail { margin: 10px 12px 12px; font-size: 0.86rem; line-height: 1.45; }
 .pfd-list-detail:empty { display: none; }
