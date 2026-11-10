@@ -261,7 +261,7 @@ Other findings from the same build:
 
 - The bundle contains the URL `https://react.dev/errors`, which the host allowlist in `scripts/check_site.py` does not list. The unminified stylesheet contains 11 em dashes.
 - The stylesheet sets `color-scheme: light dark` in several places, and the neutral theme names the Figtree font family. The site is light only by design and uses the system font stack, and `check_site.py` rejects `@font-face` and any outside host.
-- A bundler step needs Node 22 in `site.yml`, a committed or generated bundle, and notices for React, Astryx, StyleX and their dependencies in `THIRD_PARTY_NOTICES.md`.
+- A bundler step needs a Node setup step in `site.yml`, a committed or generated bundle, and notices for React, Astryx, StyleX and their dependencies in `THIRD_PARTY_NOTICES.md`.
 
 These figures come from one machine and one browser, with five loads per entry. They show the order of magnitude and the integration friction. They are not a benchmark.
 
