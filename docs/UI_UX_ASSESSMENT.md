@@ -310,7 +310,7 @@ axe-core 4.14.0 (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and
 | `frontend/pfd.css` | Styles for the list, built from the existing tokens. |
 | `frontend/selftest.js` | Three new checks (section 8.8). |
 
-The list is the non-visual alternative to the drawing. It sits before the drawing, so a keyboard or screen-reader reader meets it before the 50 focus stops of the drawing (20 units and 30 streams). It holds one button for each unit and each stream tag, in the order of `units.json`, and covers the same set as the drawing. A unit button selects the unit exactly as a click on the drawing does: the pressed state on the drawing, the unit picker and the panel all follow. A stream button marks the stream on the drawing and shows the tooltip's text, with the link to its row of the stream table in Results. Every string comes from the engine reply or from `units.json`. The list holds no number of its own, and a stream's values are the precomputed headline rows, labelled as such, as in the tooltip.
+The list is the non-visual alternative to the drawing. It sits before the drawing, so a keyboard or screen-reader reader meets it before the 50 focus stops of the drawing (20 units and 30 streams). It holds one button for each unit, in the order of `units.json`, and one for each stream tag, in the order the drawing's markup lists them, so it covers the same set as the drawing. A unit button selects the unit exactly as a click on the drawing does: the pressed state on the drawing, the unit picker and the panel all follow. A stream button marks the stream on the drawing and shows the tooltip's text, with the link to its row of the stream table in Results. Every string comes from the engine reply or from `units.json`. The list holds no number of its own, and a stream's values are the precomputed headline rows, labelled as such, as in the tooltip.
 
 ### 8.7 Accessibility after the change
 
@@ -350,9 +350,9 @@ Everything ran on the built site, served from 127.0.0.1, with the module built f
 ### 8.9 Known limitations and future maintenance
 
 - The Parameters, techno-economic and validation displays are unchanged. The audit found that they already carry grouping, units, hard and evidence ranges, source notes, a reset and a MATURE_60Y preset, and that conditional and out-of-evidence results are tagged apart from the base case. Any wording change there belongs to a separate change that the owner reviews, because the text is part of the published record.
-- The list is in process order only. Stage navigation remains the process tour. Grouping the list by plant section would need a stage field in `units.json`.
+- The list follows the process only as far as `units.json` and the drawing's markup do. Stage navigation remains the process tour. Grouping the list by plant section would need a stage field in `units.json`.
 - The list shows a stream's description and its precomputed headline values. The live reply carries no stream table, so these values do not follow the controls, and the text says so.
-- `a11y.js` observes the whole body for added nodes and visibility changes and re-measures about thirty boxes at most once per frame. If a later view re-renders very often, the observer can be narrowed to `main`.
+- `a11y.js` observes the whole body for added nodes and visibility changes and re-measures up to a few dozen boxes (37 at most, over the 20 unit panels at 390 px wide) at most once per frame; one pass with 35 boxes took about 1 ms (median of 30 timed calls, headless Edge). If a later view re-renders very often, the observer can be narrowed to `main`.
 - `selftest.js` is still shipped in the production site, as before.
 - Testing was in Edge only, and Lighthouse was not measured (section 8.8).
 - If Astryx is looked at again, the conditions are a Node step in `site.yml`, notices for every bundled dependency, a narrow change to the host and dash rules, islands placed outside the `innerHTML` mount points, and a per-component stylesheet. The first candidates would be a new modal or a new form, which the site does not have today.

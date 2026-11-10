@@ -24,6 +24,11 @@ function clean(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+/** Text of an element with one space between its child nodes, since inline children such as a bold label carry none in the markup. */
+function spoken(el) {
+  return clean(Array.from(el.childNodes, (n) => n.textContent).join(" "));
+}
+
 /** The nearest caption or heading that says what the box holds. */
 export function regionName(box) {
   if (box.matches(".pfd-side")) return "Unit panel and process tour";
@@ -32,7 +37,8 @@ export function regionName(box) {
   const eq = box.closest(".eq");
   if (eq) {
     const head = eq.querySelector(".eq-head");
-    if (head && clean(head.textContent)) return `Equation ${clean(head.textContent).slice(0, 80)}`;
+    const text = head ? spoken(head).slice(0, 80) : "";
+    if (text) return /^Eq\./.test(text) ? text : `Equation ${text}`;
   }
   for (let n = box; n && n !== document.body; n = n.parentElement) {
     for (let s = n.previousElementSibling; s; s = s.previousElementSibling) {
