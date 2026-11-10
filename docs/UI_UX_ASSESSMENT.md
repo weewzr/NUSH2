@@ -332,8 +332,8 @@ Everything ran on the built site, served from 127.0.0.1, with the module built f
 
 | Check | Result |
 |---|---|
-| `scripts/build_site.py` into a scratch folder | built, 33 files, 3,579,556 bytes. The baseline build has 32 files and 3,564,075 bytes. The module is unchanged at 1,067,548 bytes. |
-| Size change against the baseline build | JS 325,123 to 337,964 bytes (gzip 98,236 to 101,982), CSS 51,451 to 53,325 bytes (gzip 14,257 to 14,623), HTML 43,200 to 43,966 bytes. Total gzip 708,181 to 712,493 bytes. |
+| `scripts/build_site.py` into a scratch folder | built, 33 files, 3,579,816 bytes. The baseline build has 32 files and 3,564,075 bytes. The module is unchanged at 1,067,548 bytes. |
+| Size change against the baseline build | JS 325,123 to 338,224 bytes (gzip 98,236 to 102,125), CSS 51,451 to 53,325 bytes (gzip 14,257 to 14,623), HTML 43,200 to 43,966 bytes. Total gzip 708,181 to 712,636 bytes. |
 | `scripts/selftest.py` at 1440 by 900 | PASS: 36 passed and 1 skipped (`pfd_streams_bound`, skipped as before because the live reply carries no stream table). The baseline run had 33 passed and 1 skipped. 0 browser errors, 0 requests to another host. |
 | The same at 375 by 812 with phone emulation, and with `--reduced-motion` at both sizes | PASS each time, 36 passed and 1 skipped. |
 | Planted fault: the new `selftest.js` run against a copy of the baseline build | FAIL on exactly the three new checks. `unit_names_hold_label` named the nine units that axe also flagged (htgr, circ_primary, ihx, power, smr, wgs, rich_lean_hx, co2_storage, psa), `scroll_boxes_focusable` named an equation line and a validation table, and `pfd_list_selects` found no list. Every earlier check passed. |
