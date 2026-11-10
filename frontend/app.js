@@ -528,6 +528,14 @@ function loadPfd() {
     });
 }
 
+// Tab stops and names for boxes that scroll (wide tables, equations, the unit
+// panel). Loaded apart from the shell for the same reason as the PFD module.
+function loadScrollRegions() {
+  import("./a11y.js?v=__COMMIT__")
+    .then((m) => m.watchScrollRegions())
+    .catch((err) => console.error(`Keyboard access to scrolling boxes did not load: ${err && err.message ? err.message : err}`));
+}
+
 async function init() {
   // The skip link moves focus to the content without touching the route hash.
   const skip = $("[data-skip]");
@@ -536,6 +544,7 @@ async function init() {
   window.addEventListener("hashchange", showRoute);
   showRoute();
   loadPfd();
+  loadScrollRegions();
   setStatus("busy", "Loading the engine registry");
   try {
     state.registryAt = performance.now();
