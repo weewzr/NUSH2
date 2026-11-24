@@ -22,7 +22,7 @@ Milestone 1 (repository audit and baseline lock) recorded below. Next: milestone
 
 | # | Milestone | Status | Commit | Pushed head |
 |---|---|---|---|---|
-| 1 | Repository audit and baseline lock | done, with open findings F1 to F3 below | see "Milestone 1" | see "Milestone 1" |
+| 1 | Repository audit and baseline lock | recorded and pushed; the inherited baseline fails G5, `build_numbers.py`, the two SymPy scripts and one browser check (open findings F1 to F4 below) | `9fc36ff`, `b37a76d`, `241e39e` and the results commit | see "Milestone 1" |
 | 2 | Reference-plant equations and implementation | not started | | |
 | 3 | Reference integration and ninth export | not started | | |
 | 4 | Carbon and subsidy completion | not started | | |
@@ -90,9 +90,53 @@ Known content of the pushed history that the scan accepts: 53 commit messages (a
 - Browser self-test: Microsoft Edge through `scripts/selftest.py --chrome <msedge.exe>`.
 - Fork-error settings (`TESTING_AND_VERIFICATION.md` section 6): one cargo job at a time, `CARGO_BUILD_JOBS=2`, `cargo test -- --test-threads=2`, steps run sequentially by one script that logs each exit code and wall time; no browser open during cargo runs. No fork or resource error occurred.
 
-### Test and verification results
+### Clean rebuild and full gate on `241e39e` (2026-11-24, one script, sequential)
 
-Filled in below by the gate run on the milestone commit.
+`cargo clean`, `_site/` and `build/` removed, then every step in order with `CARGO_BUILD_JOBS=2` and `--test-threads=2`. Wall times on this machine (Windows 11, `x86_64-pc-windows-gnu`).
+
+| Step | Command | Result | Time |
+|---|---|---|---|
+| clean build | `cargo build --workspace --all-targets` | ok | 87 s |
+| text guard | `python -I scripts/check_clean.py` | 275 files, 0 hits | 4 s |
+| G6 format | `cargo fmt --all --check` | ok | 1 s |
+| G6 lint | `cargo clippy --workspace --all-targets -- -D warnings` | ok | 21 s |
+| G6 tests (dev) | `cargo test --workspace -- --test-threads=2` | 480 passed, 0 failed, 0 ignored (35 test binaries and doc-test sets) | 225 s |
+| release CLI | `cargo build --release -p nush2_cli` | ok | 45 s |
+| G0 | `engine/vv/data/pre_reference_results/` | present, 8 tables | |
+| G2 | `nush2 export --basis legacy`, then `compare_results.py engine/vv/data/legacy_results <dir> --subset --names <7 tables> --allow-cell Validation_Results.csv:PARAMS_COMPLETE:conditions --allow-cell Validation_Results.csv:EXPORT_BYTE_IDENTICAL:conditions` (as in `ci.yml`) | PASS | 54 s |
+| G5 | `nush2 export`, then `compare_results.py results <dir>` | **FAIL**, 12 cells (finding F1) | 50 s |
+| G0 regression | `compare_results.py engine/vv/data/pre_reference_results <dir>` | **FAIL**, the same 12 cells (the snapshot equals `results/`) | |
+| G4 (milestone 1 form) | regenerated balance tables against the committed ones, byte for byte | energy balance identical (legacy export, default export, `results/`, snapshot); mass balance **differs** in the same 12 cells (F1) | |
+| G1 | `cargo test --workspace eq_s_9b eq_s_8` | 7 passed | 6 s |
+| G1 | `subsidy_zero_share_equals_economic_ledger` in `build_numbers.py` | **not reached**: `build_numbers.py` stops earlier (finding F2) | |
+| numbers | `python -I scripts/build_numbers.py`; `--self-test` | **FAIL** (F2); self-test PASS | |
+| Rust text guard | `cargo test -p nush2_plant --test no_internal_pointers` | 2 passed | 1 s |
+| history scan | `python -I scripts/scan_history.py` | 56 commits, 635 objects, 0 hits | 5 s |
+| SymPy | `python -I math/verify/sympy_carbon.py` | **108 of 115**, exit 1 (F3) | 2 s |
+| SymPy | `python -I math/verify/sympy_subsidy.py` | **118 of 120**, exit 1, C19 and C15b (F3) | 3 s |
+| release tests | `cargo test --workspace --release -- --test-threads=2` | 480 passed, 0 failed | 346 s |
+| wasm | `build_wasm.py` with `GIT_SHA` set; `check_wasm.py` | 1,127,673 bytes, 0 imports, PASS | 37 s |
+| G6 site build | `build_site.py --wasm ... --results results --commit <sha> --run-id local --test-log target/test.log --out _site` | ok | 2 s |
+| G6 content guard | `check_site.py --site _site --repo .`; with `--prove` | PASS (34 site files, 269 repository files, 0 hits); proof 34 of 34 and 11 of 11 plants caught | 7 s |
+| G6 browser self-test | `selftest.py --site _site --chrome <Edge> --expect-commit <sha>`, at 1440 x 900, 1440 x 900 reduced motion, 375 x 812 mobile, 1024 x 600 and 1024 x 768 | **FAIL** at every viewport: 35 passed, 1 skipped (`pfd_streams_bound`, by design), 1 failed (`headline_parity`, finding F4); 0 console errors, 31 requests, 0 to another host, 0 network problems. `tour_keyboard` passes at 1024 x 600. | 54 s each |
+| G3, G3b | `REF_BASIS` | not applicable before milestone 3 (no reference basis exists) | |
+
+No fork or resource error occurred. No tolerance, golden file, snapshot or results table was changed.
+
+### Open findings of milestone 1 (inherited from the development line, none fixed here)
+
+- **F1, G5 on this platform.** The default export differs from `results/Integrated_Mass_Balance.csv` in 12 cells of run `FS_B_REC_F_T800` (streams S07, S07A and S08, species h2, co, co2, h2o), by up to 8e-6 kmol/h on values near 4,358 kmol/h, beyond the tolerance of `compare_results.py` (one printed unit, absolute 1e-6, relative 1e-9). Every other run differs by at most about one printed unit, which the script documents as the expected difference between platforms; the same run on the legacy basis differs by up to 5 printed units and passes. The engine sources are unchanged since `f71c2b5` and the mass balance table was last written at `cc03f19`, so the cause is the build platform (this machine compiles for `x86_64-pc-windows-gnu`) amplified by the 800 C flowsheet solve. No code defect is shown. CI (Linux) has never run on the development line, so whether CI reproduces `results/` is unknown. Next step: run `ci` and `site` on the pull request, then decide in milestone 3 (which regenerates the tables) how the T800 run is made reproducible, without loosening the tolerance.
+- **F2, `build_numbers.py` stops on the committed tables.** "results files disagree: RES_ABATEMENT_T_Y 557767.415516 against EM_B_REC_F_INL_9P21_DIRECT_ATM_ABATEMENT_T_Y 583851.592283; RES_BURNED_C_KMOL_H 99.205227 against MB_B_REC_F_N2_RICH_CUT_C_KMOL_H 93.924198" (the abatement values quoted are upper bounds on the modelled streams). The script runs clean on the tables of `8750b09`, `a9cd939`, `e768ee9` and `f0e8d84` and stops from `cc03f19` on. Its two cross-table identities take the headline abatement as the INL-baseline row and the burned carbon as the nitrogen-rich cut alone, which held on the legacy basis. Until it is updated, `build/numbers.json` cannot be built, so the README tokens, the derivation values and the G1 zero-share check of `build_numbers.py` are not available. Whether the burned-carbon identity or the exported row is wrong on the independent basis is not yet established. Belongs to milestones 4 and 5 (carbon completion, regeneration).
+- **F3, the nine stale SymPy checks.** True counts 108 of 115 and 118 of 120 (the records said 115 and 120). Both scripts pass in full at `a9cd939`. Carbon: the seven checks named in derivation 01 compare legacy values with `results/`, which holds the independent basis since `cc03f19`; the values the script computes equal the legacy snapshot rows to the printed digits. Subsidy C15b: its two exact ratio conditions hold, and only the printed excess 37.985 S$/t fails, because it was computed at the legacy abatement (39.366876 S$/t now, inverse to the abatement). Subsidy C19: the rescaling factor 2 no longer reaches the case s* < 0 since `9565fe9` (needs more than 2.0318); the other four cases hold. No model defect shown. Repair with written decisions belongs to milestone 4 (`CARBON_AND_SUBSIDY.md` section 4). Records corrected in `docs/ABATEMENT_SUBSIDY_LOG.md` and derivations 01 and 02.
+- **F4, browser `headline_parity`.** `kpi.abatement_system_t_y` and `kpi.abatement_lifecycle_t_y` of the wasm reply (507,347.36 and 601,999.94 t/y) differ from `data/reference.json` (521,654.03 and 616,306.61 t/y). The wasm values equal the `IEAGHG_9p00` rows of `results/Emissions_Ledger.csv` (the central reference on the independent basis, and the rows the wasm unit test compares with); `scripts/build_site.py` lines 101 to 104 still take the `INL_9p21` rows, and the page text in `frontend/views.js` line 385 still says the INL baseline gives the headline. Both are site-script and label work of milestone 7; fixing the reference alone would turn the check green while the page keeps the wrong label. These abatement values are upper bounds while U1, U2, U4b and U6 stay unknown.
+- **G4 wording.** `TESTING_AND_VERIFICATION.md` G4 asks for byte-identical balance tables "on both bases". Across the carbon bases the mass balance differs by design (for example the `A_INL_SEL` rows), at the committed state too; the energy balance is identical. The log's "byte-identical" statements compare a table before and after a change. G4 is therefore read as "unchanged by the reference-basis switch" from milestone 3 on, and at milestone 1 as "regenerated equals committed".
+- **README headline.** The README carries the legacy-basis headline and abatement figures from `main`; the committed tables on this branch are on the independent basis. Unchanged at milestone 1; regenerated from tokens in milestone 9 once F2 is resolved.
+- **CI trigger.** `ci.yml` and `site.yml` run on pushes to `main` and `develop` and on pull requests to `main`; a push of the completion branch alone starts no CI. The release gate needs a pull request (or a manual dispatch).
+- **Reference files.** `reference/IEAGHG_REFERENCE_SPEC.md` (175) and `IEAGHG_REFERENCE_SPEC_CRITIQUE.md` (39) hold 214 `<working folder>` substitutions; left unedited, to be treated as unreadable where damaged.
+
+### Commits of milestone 1
+
+`9fc36ff` (merge of `origin/main`), `b37a76d` (policy), `241e39e` (records and history scan), and the commit that adds these results to this file. Pushed head: the tip of `origin/feature/reference-plant-completion` after the push of 2026-11-24.
 
 ## Test and verification results
 
@@ -110,7 +154,7 @@ None blocking milestone 2. Candidate: no sourced Singapore electricity export pr
 
 1. Milestone 2: WP0 of `ENGINE_REFERENCE_PLANT.md` (registry entries, `refplant.rs` structs and reader; nothing numerical may change).
 2. Re-derive every IEAGHG value from the report PDF with its page: the two files in `reference/` contain 214 `<working folder>` substitutions (175 in the specification, 39 in the critique), each of which also removed the character before a colon, so any value next to one is unreadable.
-3. Open findings F1 to F3 of milestone 1 (below).
+3. Open findings F1 to F4 of milestone 1 (below); F1 needs CI on a pull request.
 
 ## Update 2026-11-10
 
