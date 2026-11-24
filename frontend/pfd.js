@@ -19,6 +19,8 @@ let flows = null;
 let selected = null;
 let pinned = null;
 const el = {};
+// Unit names as the page first states them, before the engine reply supplies its own.
+const baseLabel = new Map();
 
 const unitEls = () => Array.from(el.svg.querySelectorAll("[data-unit]"));
 
@@ -31,8 +33,25 @@ function unitLabel(id) {
   const res = result();
   if (res && res.units && res.units[id] && res.units[id].label) return res.units[id].label;
   if (reg && reg.units && reg.units[id] && reg.units[id].label) return reg.units[id].label;
-  const g = el.svg.querySelector(`[data-unit="${CSS.escape(id)}"]`);
-  return g ? g.getAttribute("aria-label").split(",")[0] : id;
+  return baseLabel.get(id) || id;
+}
+
+/** What a sighted reader sees on a unit: its own labels on the drawing, with their bound values. */
+function visibleText(g) {
+  // The drawing prints CO₂ with a subscript character; the names say CO2.
+  return Array.from(g.querySelectorAll("text")).map((t) => t.textContent).join(" ").replace(/₂/g, "2").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Accessible name of a unit. It starts with the text printed on the drawing when
+ * the unit's full name does not already contain it, so the spoken name always
+ * holds the visible label (WCAG 2.5.3, Label in Name).
+ */
+function unitName(g, id, st) {
+  const label = unitLabel(id);
+  const seen = visibleText(g);
+  const lead = seen && !label.toLowerCase().includes(seen.toLowerCase()) ? `${seen}, ` : "";
+  return `${lead}${label}, ${STATUS[st] || "status loading"}`;
 }
 
 function unitStatus(id) {
@@ -85,6 +104,7 @@ async function loadFlows() {
     flows = false;
   }
   labelStreams();
+  showListDetail();
   if (api.state.route === "pfd") renderPanelNow();
 }
 
@@ -105,7 +125,7 @@ function paintUnits() {
     const st = unitStatus(id);
     g.classList.toggle("is-external", st === "external");
     if (st) g.dataset.status = st;
-    g.setAttribute("aria-label", `${unitLabel(id)}, ${STATUS[st] || "status loading"}`);
+    g.setAttribute("aria-label", unitName(g, id, st));
   }
   const sel = el.select;
   if (sel && sel.options.length !== order().length) {
@@ -114,6 +134,7 @@ function paintUnits() {
     for (const o of sel.options) o.textContent = unitLabel(o.value);
   }
   if (sel && selected) sel.value = selected;
+  paintList();
 }
 
 // ------------------------------------------------------------ selection
@@ -124,13 +145,17 @@ function select(id, opts = {}) {
   for (const g of unitEls()) g.setAttribute("aria-pressed", g.dataset.unit === id ? "true" : "false");
   if (el.select) el.select.value = id;
   if (opts.reveal) reveal(id);
+  paintList();
   renderPanelNow();
 }
 
 /** Scroll the sideways scroller so the unit sits in view. Display geometry only.
  * The scroll jumps when the reader asks for reduced motion. */
 function reveal(id) {
-  const g = el.svg.querySelector(`[data-unit="${CSS.escape(id)}"]`);
+  revealNode(el.svg.querySelector(`[data-unit="${CSS.escape(id)}"]`));
+}
+
+function revealNode(g) {
   const box = el.scroll;
   if (!g || !box || box.scrollWidth <= box.clientWidth) return;
   const r = g.getBoundingClientRect();
@@ -179,14 +204,14 @@ function bindUnits() {
 
 // ------------------------------------------------------------ stream tooltip
 
-function tipHtml(id, withLink) {
+function tipHtml(id, withLink, withClose = withLink) {
   const d = defs || { streams: {} };
   const f = streamFacts(id, d, unitLabel, flows);
   const data = f.data.na
     ? `<div class="tip-na">${f.engine ? "Stream conditions: n/a, " : "No row in the stream table. "}${esc(f.data.text)}.</div>`
     : `<div class="tip-row">${esc(f.data.text)}</div><div class="tip-na">Precomputed at the headline basis; it does not follow the controls.</div>`;
   const link = withLink && f.engine && !f.data.na;
-  return `${withLink ? '<button type="button" class="tip-close" aria-label="Close">×</button>' : ""}
+  return `${withClose ? '<button type="button" class="tip-close" aria-label="Close">×</button>' : ""}
     <span class="tip-id">${esc(id)}</span>${esc(f.name)}
     <div class="tip-row">From ${esc(f.from)} to ${esc(f.to)}${f.crosses ? ". Crosses the dashed boundary" : ""}.${f.drawn ? ` ${esc(f.drawn)}.` : ""}</div>
     ${data}
@@ -282,6 +307,86 @@ function bindStreams() {
   });
 }
 
+// ------------------------------------------------------------ list alternative
+
+// The same units and stream tags as the drawing, as two plain lists. Choosing
+// an item selects what the drawing selects, so the whole flowsheet can be
+// read and operated without the picture. Text comes from the engine reply and
+// from units.json; the list holds no values of its own.
+
+let listStream = null;
+
+function buildList() {
+  if (!el.listUnits || !el.listStreams) return;
+  const ids = order();
+  el.listUnits.innerHTML = ids
+    .map((id) => `<li><button type="button" class="pl-btn" data-pick-unit="${esc(id)}" aria-pressed="false"><span class="pl-name"></span><span class="pl-meta"></span></button></li>`)
+    .join("");
+  const tags = [...new Set(Array.from(el.svg.querySelectorAll("[data-stream]")).map((g) => g.dataset.stream))];
+  el.listStreams.innerHTML = tags
+    .map((t) => `<li><button type="button" class="pl-btn" data-pick-stream="${esc(t)}" aria-pressed="false"><span class="p-tag">${esc(t)}</span><span class="pl-name"></span><span class="pl-meta"></span></button></li>`)
+    .join("");
+  const h1 = document.getElementById("pfd-list-units-h");
+  const h2 = document.getElementById("pfd-list-streams-h");
+  if (h1) h1.textContent = `Equipment (${ids.length})`;
+  if (h2) h2.textContent = `Streams (${tags.length})`;
+  paintList();
+}
+
+function paintList() {
+  if (!el.listUnits || !el.listStreams) return;
+  for (const b of el.listUnits.querySelectorAll("[data-pick-unit]")) {
+    const id = b.dataset.pickUnit;
+    b.setAttribute("aria-pressed", id === selected ? "true" : "false");
+    b.querySelector(".pl-name").textContent = unitLabel(id);
+    b.querySelector(".pl-meta").textContent = STATUS[unitStatus(id)] || "status loading";
+  }
+  for (const b of el.listStreams.querySelectorAll("[data-pick-stream]")) {
+    const id = b.dataset.pickStream;
+    b.setAttribute("aria-pressed", id === listStream ? "true" : "false");
+    if (!defs) continue;
+    const f = streamFacts(id, defs, unitLabel, flows);
+    b.querySelector(".pl-name").textContent = f.name;
+    b.querySelector(".pl-meta").textContent = `${f.from} to ${f.to}`;
+  }
+}
+
+function pickStream(id) {
+  listStream = id;
+  for (const s of el.svg.querySelectorAll("[data-stream].is-tip")) s.classList.remove("is-tip");
+  const marks = Array.from(el.svg.querySelectorAll(`[data-stream="${CSS.escape(id)}"]`));
+  for (const g of marks) g.classList.add("is-tip");
+  if (marks[0]) revealNode(marks[0]);
+  showListDetail();
+  paintList();
+}
+
+function showListDetail() {
+  if (!el.listDetail || !listStream) return;
+  el.listDetail.innerHTML = tipHtml(listStream, true, false);
+}
+
+function bindList() {
+  if (el.listUnits) {
+    el.listUnits.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pick-unit]");
+      if (b) select(b.dataset.pickUnit, { reveal: true });
+    });
+  }
+  if (el.listStreams) {
+    el.listStreams.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pick-stream]");
+      if (b) pickStream(b.dataset.pickStream);
+    });
+  }
+  if (el.listDetail) {
+    el.listDetail.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-stream-link]");
+      if (a) document.dispatchEvent(new CustomEvent("nush2:stream", { detail: { id: a.dataset.streamLink } }));
+    });
+  }
+}
+
 // ------------------------------------------------------------ panel
 
 function ctx() {
@@ -359,14 +464,20 @@ export async function initPfd(a) {
   el.tip = document.getElementById("pfd-tip");
   el.panel = document.getElementById("pfd-panel");
   el.select = document.getElementById("pfd-select");
+  el.listUnits = document.getElementById("pfd-list-units");
+  el.listStreams = document.getElementById("pfd-list-streams");
+  el.listDetail = document.getElementById("pfd-list-detail");
   if (!el.svg || !el.mount || !el.tip || !el.panel) return;
+  for (const g of unitEls()) baseLabel.set(g.dataset.unit, g.getAttribute("aria-label"));
   bindUnits();
   bindStreams();
+  bindList();
   if (el.select) el.select.addEventListener("change", () => select(el.select.value, { reveal: true }));
   api.registerRoute("pfd", onRoute);
   paintUnits();
   await loadDefs();
   labelStreams();
+  buildList();
   loadFlows();
   loadTour();
   if (api.state.route === "pfd") onRoute();

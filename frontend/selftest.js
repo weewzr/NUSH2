@@ -486,6 +486,8 @@ async function tail(checks, base, ref) {
     add("charts_have_marks", empty.length === 0, `${figs.length} charts${empty.length ? `; empty: ${empty.join(", ")}` : ""}`);
   }
 
+  await accessChecks(add);
+
   const text = document.body.textContent || "";
   const hits = TEXT_RULES.filter(([, b64, flags]) => new RegExp(atob(b64), flags).test(text)).map(([label]) => label);
   if (text.includes(String.fromCharCode(0x2014))) hits.push("emdash");
@@ -502,6 +504,70 @@ async function tail(checks, base, ref) {
   const page = document.documentElement.dataset.selftest;
   add("no_console_error", errors.length === 0 && page === "pass",
     `${errors.length} error(s) caught by this test, page shell verdict ${page || "none"}${errors.length ? `: ${errors.slice(0, 5).join(" | ")}` : ""}`);
+}
+
+// ------------------------------------------------------------ keyboard and screen-reader access
+
+const FOCUSABLE = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+
+/** Names that hold the printed label, scrolling boxes that take focus, and the list that selects what the drawing selects. */
+async function accessChecks(add) {
+  try {
+    const norm = (v) => String(v || "").toLowerCase().replace(/₂/g, "2").replace(/\s+/g, " ").trim();
+    location.hash = "#pfd";
+    await sleep(ROUTE_WAIT_MS * 2);
+    const units = Array.from(document.querySelectorAll("g[data-unit]"));
+    const lacking = units.filter((g) => {
+      const seen = norm(Array.from(g.querySelectorAll("text")).map((t) => t.textContent).join(" "));
+      return seen && !norm(g.getAttribute("aria-label")).includes(seen);
+    }).map((g) => g.dataset.unit);
+    add("unit_names_hold_label", units.length > 0 && lacking.length === 0,
+      `${units.length} units${lacking.length ? `; the name lacks the printed label: ${lacking.join(", ")}` : ", each accessible name contains the text printed on the drawing"}`);
+
+    // Every box that scrolls and holds nothing focusable must itself take focus and carry a name.
+    const stuck = [];
+    let scrolling = 0;
+    for (const route of ["pfd", "parameters", "results", "export", "validation"]) {
+      location.hash = `#${route}`;
+      await sleep(ROUTE_WAIT_MS * 2);
+      for (const box of document.querySelectorAll(`#route-${route} *`)) {
+        const cs = getComputedStyle(box);
+        const x = /(auto|scroll)/.test(cs.overflowX) && box.scrollWidth > box.clientWidth + 1;
+        const y = /(auto|scroll)/.test(cs.overflowY) && box.scrollHeight > box.clientHeight + 1;
+        if (!(x || y) || box.querySelector(FOCUSABLE)) continue;
+        scrolling += 1;
+        const named = box.hasAttribute("aria-label") || box.hasAttribute("aria-labelledby");
+        if (!(box.tabIndex >= 0 && named)) stuck.push(`${route} ${box.tagName.toLowerCase()}.${String(box.className).split(" ")[0]}`);
+      }
+    }
+    add("scroll_boxes_focusable", stuck.length === 0, `${scrolling} scrolling box(es) without a focusable child at this width${stuck.length ? `; not reachable by keyboard: ${stuck.join(", ")}` : ", each with a tab stop and a name"}`);
+
+    location.hash = "#pfd";
+    await sleep(ROUTE_WAIT_MS * 2);
+    const uBtns = Array.from(document.querySelectorAll("#pfd-list-units [data-pick-unit]"));
+    const sBtns = Array.from(document.querySelectorAll("#pfd-list-streams [data-pick-stream]"));
+    const tags = new Set(Array.from(document.querySelectorAll("g[data-stream]")).map((g) => g.dataset.stream));
+    const sameSet = uBtns.length === units.length && sBtns.length === tags.size
+      && uBtns.every((b) => document.querySelector(`g[data-unit="${b.dataset.pickUnit}"]`)) && sBtns.every((b) => tags.has(b.dataset.pickStream));
+    const ub = uBtns[Math.min(3, uBtns.length - 1)];
+    if (ub) ub.click();
+    await sleep(200);
+    const drawn = ub ? document.querySelector(`g[data-unit="${ub.dataset.pickUnit}"]`) : null;
+    const panel = document.getElementById("pfd-panel");
+    const unitOk = Boolean(drawn) && drawn.getAttribute("aria-pressed") === "true" && ub.getAttribute("aria-pressed") === "true"
+      && panel.querySelectorAll("section, details, .psec").length > 0;
+    const sb = sBtns.find((b) => b.dataset.pickStream === "S01") || sBtns[0];
+    if (sb) sb.click();
+    await sleep(200);
+    const detail = document.getElementById("pfd-list-detail");
+    const sid = sb ? sb.dataset.pickStream : "";
+    const streamOk = Boolean(sb) && detail.textContent.includes(sid) && sb.getAttribute("aria-pressed") === "true"
+      && Boolean(document.querySelector(`g[data-stream="${sid}"].is-tip`)) && Boolean(detail.querySelector("[data-stream-link]"));
+    add("pfd_list_selects", sameSet && unitOk && streamOk,
+      `${uBtns.length} unit and ${sBtns.length} stream buttons against ${units.length} drawn units and ${tags.size} drawn stream tags (same set ${sameSet}); unit button selects the drawn unit and fills its panel ${unitOk}; stream button describes ${sid} and marks it on the drawing ${streamOk}`);
+  } catch (e) {
+    add("unit_names_hold_label", false, String(e && e.message ? e.message : e));
+  }
 }
 
 // ------------------------------------------------------------ process tour

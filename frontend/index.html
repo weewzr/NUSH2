@@ -78,6 +78,15 @@
             <div class="tour-track" id="tour-track" role="progressbar" aria-labelledby="tour-count"><span class="tour-fill" id="tour-fill"></span><span class="tour-ticks" aria-hidden="true"></span></div>
           </div>
         </div>
+        <details class="pfd-list" id="pfd-list">
+          <summary>Equipment and streams as a list</summary>
+          <p class="pfd-list-note">The same units and stream tags as the drawing, in process order. Choosing a unit opens its panel and marks it on the drawing. Choosing a stream marks it on the drawing and describes it below the list.</p>
+          <h3 id="pfd-list-units-h">Equipment</h3>
+          <ol class="pfd-list-items" id="pfd-list-units" aria-labelledby="pfd-list-units-h"></ol>
+          <h3 id="pfd-list-streams-h">Streams</h3>
+          <ul class="pfd-list-items" id="pfd-list-streams" aria-labelledby="pfd-list-streams-h"></ul>
+          <div class="pfd-list-detail" id="pfd-list-detail" aria-live="polite"></div>
+        </details>
         <div id="pfd-mount" class="pfd-mount" data-mount="pfd" role="region" aria-label="Process flow diagram">
           <div class="pfd-scroll" tabindex="-1">
 <svg id="pfd-svg" viewBox="0 0 2070 1000" role="group" aria-labelledby="pfd-svg-title" xmlns="http://www.w3.org/2000/svg">
