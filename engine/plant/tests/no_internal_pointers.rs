@@ -58,9 +58,14 @@ fn working_key(word: &str) -> bool {
 }
 
 /// Markdown files a source string may name: the public docs of the repository.
-const PUBLIC_MD: [&str; 2] = [
+const PUBLIC_MD: [&str; 7] = [
     "docs/final_design_decisions.md",
     "docs/validation_matrix.md",
+    "docs/abatement_subsidy_log.md",
+    "docs/abatement_subsidy_references.md",
+    "docs/derivation/01_carbon_and_abatement.md",
+    "docs/derivation/02_cost_and_subsidy.md",
+    "docs/derivation/03_reference_plant.md",
 ];
 
 /// A Markdown or Python file named in a line that is not a public repository
@@ -119,6 +124,12 @@ fn the_detector_sees_each_pattern() {
     assert!(hits("x", "TEV-961 Table 2 doc p16 (PDF p17), 5 s spacing").is_empty());
     assert!(hits("x", "engine/vv/data/freeze_values.json").is_empty());
     assert!(hits("x", "decision S11, docs/VALIDATION_MATRIX.md").is_empty());
+    assert!(hits("x", "decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md").is_empty());
+    assert!(hits(
+        "x",
+        "equation S.2 of docs/derivation/02_cost_and_subsidy.md"
+    )
+    .is_empty());
     assert!(hits("x", "built by scripts/build_numbers.py").is_empty());
     assert!(hits("x", "Khan prints no critical surface tension").is_empty());
 }
@@ -138,7 +149,7 @@ fn parameters_and_results_cite_no_working_note() {
         .filter(|p| p.extension().is_some_and(|x| x == "csv"))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 7, "{files:?}");
+    assert_eq!(files.len(), 8, "{files:?}");
     for f in files {
         let text = std::fs::read_to_string(&f).expect("results file");
         let name = f.file_name().unwrap().to_string_lossy().to_string();

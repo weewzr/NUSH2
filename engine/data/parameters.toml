@@ -446,6 +446,18 @@ locator = "whole report"
 source_status = "not_verified"
 
 [[param]]
+id = "EF_UPSTREAM_GWP100"
+value = 30.0
+unit = "t CO2e/t CH4"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEA 2026, Assessing Emissions from LNG Supply and Abatement Options, PDF p. 6: the upstream intensity EF_UPSTREAM is stated in CO2-equivalent with a 100-year global warming potential of 30 for methane. This entry labels EF_UPSTREAM; the sources read give only the aggregate, so the CO2 and CH4 parts of the upstream factor are not separated"
+locator = "PDF p. 4 (11.5 g CO2-eq/MJ) and p. 6 (GWP100 = 30)"
+source_status = "primary"
+name = "Warming potential behind the upstream gas factor"
+
+[[param]]
 id = "TS_BURDEN"
 value = 0.025
 unit = "t/t"
@@ -2468,6 +2480,294 @@ locator = "author decision"
 source_status = "primary"
 
 [[param]]
+id = "SUBSIDY_SHARE_GRID_1"
+value = 0.0
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 1"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_2"
+value = 0.25
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 2"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_3"
+value = 0.5
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 3"
+
+[[param]]
+id = "SUBSIDY_SHARE_GRID_4"
+value = 0.75
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Grant share grid of project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0, 25, 50 and 75 percent of eligible expenditure; the 75 percent case is a stress case, because no plant-capital precedent was found"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy share, grid point 4"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_REACTOR"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item reactor_capital (the reactor overnight capital); 1 means eligible, 0 means outside the grant. In definition A this item is eligible"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, reactor overnight capital"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_IHX"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item ihx_capital (the intermediate heat exchanger); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, intermediate heat exchanger"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_LICENCE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item licence_capital (the licence); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, licence"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_POWER_ISLAND"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item power_island_capital (the power island); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, power island"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_CAPTURE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item capture_capital (the capture plant); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, capture plant"
+
+[[param]]
+id = "SUBSIDY_ELIG_A_RECYCLE"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition A of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: the reactor overnight capital alone. Flag of cost item recycle_capital (the recycle train); 1 means eligible, 0 means outside the grant. In definition A this item is outside the grant"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition A eligibility, recycle train"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_REACTOR"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item reactor_capital (the reactor overnight capital); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, reactor overnight capital"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_IHX"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item ihx_capital (the intermediate heat exchanger); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, intermediate heat exchanger"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_LICENCE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item licence_capital (the licence); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, licence"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_POWER_ISLAND"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item power_island_capital (the power island); 1 means eligible, 0 means outside the grant. P4 in docs/ABATEMENT_SUBSIDY_REFERENCES.md lists power generation assets as ineligible, and decision D7b leaves the power island out"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, power island"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_CAPTURE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item capture_capital (the capture plant); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, capture plant"
+
+[[param]]
+id = "SUBSIDY_ELIG_B_RECYCLE"
+value = 1.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Definition B of project decision D7b in docs/ABATEMENT_SUBSIDY_LOG.md: reactor, IHX, capture plant, recycle train and licence. The list follows the construction cost categories of the EU Innovation Fund relevant cost methodology (P3 in docs/ABATEMENT_SUBSIDY_REFERENCES.md) and the UK Net Zero Hydrogen Fund capital strand (P4 in the same file); that each item of this plant falls inside those categories is a modelling judgement. Flag of cost item recycle_capital (the recycle train); 1 means eligible, 0 means outside the grant. Decision D7b lists this item in definition B"
+locator = "decision D7b"
+source_status = "primary"
+name = "Definition B eligibility, recycle train"
+
+[[param]]
+id = "SUBSIDY_DEFAULT_DEFINITION"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Default eligible set of the co-funding scenarios, project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 selects definition A (reactor only), 1 selects definition B. The exported table prints both definitions"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy default eligibility definition"
+
+[[param]]
+id = "SUBSIDY_DEFAULT_TIMING"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Default grant timing of the co-funding scenarios, project decision D7 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 selects a progressive grant paid pro rata with the eligible spend, 1 selects a grant paid at financial close. The exported table prints both timings"
+locator = "decision D7"
+source_status = "primary"
+name = "Subsidy default grant timing"
+
+[[param]]
+id = "SUBSIDY_SHARE_MAX"
+value = 1.0
+unit = "-"
+group = "cost"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "A share is a fraction of eligible expenditure and cannot exceed 1 (equation S.2 of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equation S.2"
+source_status = "primary"
+name = "Subsidy share upper limit"
+
+[[param]]
+id = "SUBSIDY_SOLVER_TOL"
+value = 1e-12
+unit = "-"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: bracketing tolerance of the bisection fallback for the break-even share (equation S.7d of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equation S.7d"
+source_status = "not_verified"
+name = "Subsidy break-even bisection tolerance"
+
+[[param]]
+id = "SUBSIDY_RESIDUAL_TOL"
+value = 1e-9
+unit = "S$/t"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: largest distance between the cost at a closed-form break-even share and the target before the bisection fallback takes over (equations S.7b to S.7d of docs/derivation/02_cost_and_subsidy.md)"
+locator = "equations S.7b to S.7d"
+source_status = "not_verified"
+name = "Subsidy break-even residual tolerance"
+
+[[param]]
+id = "SUBSIDY_GRANT_CASH_RATE"
+value = 0.0
+unit = "1/y"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: grant cash that has arrived and is not yet spent earns nothing (convention 3 in docs/derivation/02_cost_and_subsidy.md). Only 0 is implemented; equation S.3d gives the bound at the discount rate"
+locator = "convention 3, equation S.3d"
+source_status = "not_verified"
+name = "Subsidy return on idle grant cash"
+
+[[param]]
+id = "SUBSIDY_IDC_BASIS"
+value = 2.0
+unit = "-"
+group = "cost"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Modelling assumption, no published value: interest during construction is charged on the private balance outstanding, basis 2 of equation S.5a in docs/derivation/02_cost_and_subsidy.md. Basis 1 is the gross spend and basis 3 is the part the grant saves, which is reported and never an input. Only basis 2 is implemented"
+locator = "equation S.5a"
+source_status = "not_verified"
+name = "Subsidy interest during construction basis"
+
+[[param]]
+id = "SUBSIDY_GAP_LIMIT"
+value = 0.01
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Largest accepted gap between the ledger and the discounted cash flow at a subsidised point, as a share of the ledger cost: 1 percent (project decision D11 in docs/ABATEMENT_SUBSIDY_LOG.md). The comparison with the gap predicted by the derivation is a separate check"
+locator = "decision D11"
+source_status = "primary"
+name = "Subsidy ledger and cash flow gap limit"
+
+[[param]]
 id = "SMR_ISLAND_TCR_EURM"
 value = 222.89
 unit = "EUR2014 M"
@@ -2622,3 +2922,1898 @@ source = "IEAGHG 2017-02 Case 1A, aMDEA on shifted syngas, about 3.03 GJ/t from 
 locator = "PDF p68, p75 to p76"
 source_status = "via_reader"
 decision = "D25"
+
+[[param]]
+id = "CARBON_BASIS"
+value = 1.0
+unit = "flag"
+group = "carbon"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Carbon basis of every abatement figure, project decisions D1 and D12 in docs/ABATEMENT_SUBSIDY_LOG.md: 1 computes captured and emitted CO2 from the plant's own stream ledger, 0 selects the legacy ledger anchored to the INL Case 5 and Case 6 values. The command line flag --basis sets it"
+locator = "decisions D1 and D12"
+source_status = "primary"
+name = "Carbon basis"
+
+[[param]]
+id = "CARBON_BASELINE"
+value = 0.0
+unit = "flag"
+group = "carbon"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Central unabated reference of the independent basis, project decision D2 in docs/ABATEMENT_SUBSIDY_LOG.md: 0 is the IEAGHG 2017-02 Case 1 intensity, 1 the INL intensity, 2 the Cho fleet average. The other two stay in the tables as comparison rows"
+locator = "decision D2"
+source_status = "primary"
+name = "Central unabated reference"
+
+[[param]]
+id = "CRYO_C_RECOVERY"
+value = 0.752178065489
+unit = "-"
+low = 0.729852
+high = 0.771783
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the PSA reject carbon that the cryogenic unit returns to the reformer. The unit is not simulated, so the atom balances cannot fix this share and it is a design input (project decision D8 in docs/ABATEMENT_SUBSIDY_LOG.md). The central value is the share that INL Case 6 implies through card J.7 (1927 st/d, Selexol 99%, carbon split 0.775), so it carries INL information. The band is the same calculation at the carbon split bounds 0.79 and 0.76"
+locator = "decision D8; equation N.4.1 of docs/derivation/01_carbon_and_abatement.md"
+source_status = "primary"
+name = "Cryogenic carbon recovery"
+
+[[param]]
+id = "CRYO_H2_RETURN"
+value = 0.921629763840
+unit = "-"
+low = 0.871630
+high = 0.971630
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the PSA reject hydrogen that the cryogenic unit returns ahead of the PSA, a design input (project decision D8 in docs/ABATEMENT_SUBSIDY_LOG.md). The central value is the closure that makes INL's 34.0 MMSCFD of gas give INL's 29,000 lb/h of hydrogen at Case A, so it carries INL information. The band of plus and minus 0.05 has no source and only marks the scale of the sensitivity"
+locator = "decision D8; equation N.1.4 of docs/derivation/01_carbon_and_abatement.md"
+source_status = "primary"
+name = "Cryogenic hydrogen return"
+
+[[param]]
+id = "COND_CO2_VENT"
+value = 1.0
+unit = "-"
+low = 0.0
+high = 1.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Share of the CO2 dissolved in the process condensate that reaches the atmosphere. The plant model does not follow the condensate, and an unknown fate must not count as zero emission, so the central value is 1 (equation N.5.2 of docs/derivation/01_carbon_and_abatement.md). The same share applies to the unabated reference"
+locator = "equation N.5.2"
+source_status = "primary"
+name = "Condensate CO2 vented"
+
+[[param]]
+id = "CARBON_CLOSURE_TOL"
+value = 1.0e-9
+unit = "-"
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Tolerance of the relative carbon closure residual, equal to the element tolerance of the flowsheet. A good converged run sits more than two orders below it and the smallest modelled stream sits six orders above it (equation N.6.1 of docs/derivation/01_carbon_and_abatement.md)"
+locator = "equation N.6.1"
+source_status = "primary"
+name = "Carbon closure tolerance"
+
+[[param]]
+id = "TS_SHIP_G_T_KM"
+value = 6.77
+unit = "g fuel/t/km"
+low = 3.21
+high = 7.07
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Ship fuel per tonne of CO2 and kilometre for a 10 kt ship (3.21 for 100 kt, 7.07 for 2.5 kt), Roussanaly et al., Energies 14(18):5635, 2021. Round trip basis inferred from agreement with Element Energy 2018"
+locator = "Table 4, PDF p9"
+source_status = "via_reader"
+name = "Ship fuel per tonne and kilometre"
+
+[[param]]
+id = "TS_SHIP_FUEL_MWH_T"
+value = 11.63
+unit = "MWh/t"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Energy content of marine diesel, Element Energy for BEIS, Shipping CO2 UK cost estimation study, 2018"
+locator = "Table 4-7, PDF p29"
+source_status = "via_reader"
+name = "Marine diesel energy content"
+
+[[param]]
+id = "TS_SHIP_FUEL_EF"
+value = 74.1
+unit = "t CO2/TJ"
+low = 74.1
+high = 77.4
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "CO2 per energy of gas or diesel oil, IPCC 2006 Guidelines Vol. 2 Ch. 3 (77.4 for residual fuel oil)"
+locator = "Table 3.5.2"
+source_status = "primary"
+name = "Ship fuel CO2 factor"
+
+[[param]]
+id = "TS_SHIP_DIST_KM"
+value = 1000.0
+unit = "km"
+low = 200.0
+high = 2000.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "One-way shipping distance to the store. The repository states no route, so this is a labelled modelling assumption; the cited cost study evaluates 200 km and 1000 km (Element Energy for BEIS, 2018) and the band widens that range"
+locator = "modelling assumption"
+source_status = "not_verified"
+name = "Shipping distance"
+
+[[param]]
+id = "TS_COND_KWH_T"
+value = 19.6
+unit = "kWh/t"
+low = 9.0
+high = 83.1
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Liquefaction and conditioning electricity for CO2 delivered pre-pressurised (the plant's S20 leaves at 2015 psia), medium-pressure ship, Element Energy for BEIS, 2018. The choice of that row is the assumption. Low is the 90 bara feed of Roussanaly et al. 2021 Table 3, high the non-pressurised feed of the same study"
+locator = "Table 4-2, PDF p26"
+source_status = "via_reader"
+name = "CO2 conditioning electricity"
+
+[[param]]
+id = "TS_INJ_KWH_T"
+value = 5.0
+unit = "kWh/t"
+low = 4.0
+high = 5.0
+group = "carbon"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Offshore pumping from 6.5 to 150 bar, IEAGHG Technical Report 2020-10. The top of the printed 4 to 5 kWh/t range is taken so that the abatement is not overstated"
+locator = "conditioning section, PDF p59"
+source_status = "via_reader"
+name = "Injection pumping electricity"
+
+[[param]]
+id = "TS_TERMINAL_FRAC"
+value = 0.00048
+unit = "t/t"
+group = "carbon"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "Terminal and injection operating emissions of the Northern Lights design, 720 t CO2/y over 1.5 Mt/y (Equinor for Gassnova, 2019); a preliminary estimate"
+locator = "PDF p18"
+source_status = "via_reader"
+name = "Terminal operating emissions"
+
+[[param]]
+id = "TS_PURGE_FRAC"
+value = 0.0009
+unit = "t/t"
+group = "carbon"
+class = "calculated"
+rigour = "fixed_assumption"
+source = "Upper bound for purge, cool-down and methane slip derived from the Northern Lights carbon footprint report (Gentile et al., 2023): 4 percent of 0.026 t CO2e per t stored"
+locator = "Results text, Figs 3 to 6"
+source_status = "via_reader"
+name = "Purge and cool-down emissions"
+
+[[param]]
+id = "TS_GRID_EF"
+value = 0.4080
+unit = "t CO2/MWh"
+group = "carbon"
+class = "published"
+rigour = "fixed_assumption"
+source = "Singapore grid emission factor for 2020, Energy Market Authority via data.gov.sg (dataset updated 6 Jun 2024). The legacy GRID_EF is left unchanged"
+locator = "datastore rows 2005 to 2020"
+source_status = "primary"
+name = "Grid emission factor of the T&S electricity"
+
+# IEAGHG 2017-02 Base Case reference plant (decision D18, docs/derivation/03_reference_plant.md).
+# Page numbers are PDF pages of IEAGHG Report 2017-02, Techno-Economic Evaluation of SMR Based
+# Standalone (Merchant) Hydrogen Plant with CCS. The stream entries REF_S{nn}_* hold the printed Heat
+# and Material Balance of the Base case; a mole fraction printed as 0.0000 has no entry and reads as 0.
+# Streams 2 and 3 carry the printed composition of stream 1, streams 10, 11, 14 and 15 are printed as
+# pure water, and streams 12 and 13 are printed as 0.9999+ hydrogen and are taken as pure hydrogen.
+
+[[param]]
+id = "REF_BASIS"
+value = 0.0
+unit = "flag"
+group = "reference"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Reference switch of decision D18: 1 feeds the reconstructed IEAGHG 2017-02 Base Case into the independent carbon basis, 0 keeps the independent basis of the frozen snapshot engine/vv/data/pre_reference_results. Ships as 0 until the results tables are regenerated on the reconstructed reference"
+locator = "decision D18"
+source_status = "primary"
+decision = "D18"
+name = "Reference plant switch"
+
+[[param]]
+id = "REF_H2_NM3_H"
+value = 100000.0
+unit = "Nm3/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2 (Plant Performance Summary), Base Case, H2 to B.L."
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG hydrogen product, volume"
+
+[[param]]
+id = "REF_NM3_KMOL"
+value = 22.414
+unit = "Nm3/kmol"
+group = "reference"
+class = "assumed"
+rigour = "fixed_assumption"
+source = "Normal cubic metre at 0 C and 101.325 kPa. The report prints no definition; 4,461.5 kmol/h of stream 12 (PDF p44) times 22.414 gives 100,000.06 Nm3/h against the 100,000 Nm3/h of Table 2 (PDF p16)"
+locator = "stream 12, PDF p44; Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "Normal volume per kmol"
+
+[[param]]
+id = "REF_NG_LHV_MJ_KG"
+value = 46.50
+unit = "MJ/kg"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, natural gas LHV"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG natural gas LHV (Table 2)"
+
+[[param]]
+id = "REF_NG_LHV_ANNEX_MJ_KG"
+value = 46.502
+unit = "MJ/kg"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Reference Document (Task 2), Table 1 Natural Gas Specifications, Sheet 9 of 24; a cross-check of the Table 2 value only"
+locator = "Table 1, Sheet 9 of 24, PDF p255"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG natural gas LHV (specification)"
+
+[[param]]
+id = "REF_NG_HHV_MJ_KG"
+value = 51.473
+unit = "MJ/kg"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Reference Document (Task 2), Table 1 Natural Gas Specifications, Sheet 9 of 24"
+locator = "Table 1, Sheet 9 of 24, PDF p255"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG natural gas HHV"
+
+[[param]]
+id = "REF_H2_LHV_MJ_KG"
+value = 119.96
+unit = "MJ/kg"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, H2 LHV; the same value in Reference Document Table 2 Hydrogen Specifications (Sheet 10 of 24, PDF p256)"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG hydrogen LHV"
+
+[[param]]
+id = "REF_ENERGY_IN_MW"
+value = 394.77
+unit = "MW"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, Total Energy Input (A); a check target of the reconstruction"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG total energy input (LHV)"
+
+[[param]]
+id = "REF_ENERGY_H2_MW"
+value = 299.70
+unit = "MW"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, Total Energy in Product (B); a check target of the reconstruction"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG energy in the hydrogen product (LHV)"
+
+[[param]]
+id = "REF_POWER_GROSS_MWE"
+value = 11.500
+unit = "MWe"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, Gross Power Output from COGEN Plant; the utility sheet prints -11,500 kW for the power island (PDF p48)"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG gross power"
+
+[[param]]
+id = "REF_POWER_H2_PLANT_MWE"
+value = 1.216
+unit = "MWe"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, H2 Plant load; the utility sheet prints 1216 kW for the hydrogen plant (PDF p48)"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG hydrogen plant power load"
+
+[[param]]
+id = "REF_POWER_AUX_ISLAND_KW"
+value = 19.0
+unit = "kW"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Estimated Utility Consumptions, Base case, power island electric power; with the utilities and BoP row it makes the 0.366 MWe of COGEN auxiliaries, utilities and BOP in Table 2 (PDF p16)"
+locator = "Estimated Utility Consumptions, PDF p48"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG power island auxiliary load"
+
+[[param]]
+id = "REF_POWER_AUX_BOP_KW"
+value = 347.0
+unit = "kW"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Estimated Utility Consumptions, Base case, utilities and BoP electric power"
+locator = "Estimated Utility Consumptions, PDF p48"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG utilities and balance of plant load"
+
+[[param]]
+id = "REF_POWER_NET_MWE"
+value = 9.918
+unit = "MWe"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 2, Base Case, Export Power to the Grid (C); the utility sheet total is -9,918 kW (PDF p48); a check target of the power balance"
+locator = "Table 2, PDF p16"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG net export power"
+
+[[param]]
+id = "REF_RADIANT_MMKCAL_H"
+value = 82.63
+unit = "MMkcal/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Preliminary Equipment List, Base case, hydrogen plant, steam reformer furnace duty, marked Radiant Duty; an indicator only, no furnace efficiency is derived from it"
+locator = "equipment list sheet 5 of 8, PDF p54"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG reformer furnace radiant duty"
+
+[[param]]
+id = "REF_UTILITY_FUEL_MMKCAL_H"
+value = 48.2
+unit = "MMkcal/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Estimated Utility Consumptions, Base case, hydrogen plant fuel (total 48.7 with 0.5 for utilities and BoP); a cross-check of the natural gas fuel of stream 3"
+locator = "Estimated Utility Consumptions, PDF p48"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG utility-sheet fuel of the hydrogen plant"
+
+[[param]]
+id = "REF_STEAM_NEIGHBOUR_T_H"
+value = 0.0
+unit = "t/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Overall Block Flow Diagram, Base case: the battery-limit outlets are hydrogen, flue gas, power, waste water and sea water, with no steam; the utility sheet total prints 0 for LP, MP and HP steam (PDF p48)"
+locator = "Overall Block Flow Diagram, PDF p34; Estimated Utility Consumptions, PDF p48"
+source_status = "primary"
+decision = "D19"
+name = "IEAGHG steam crossing the battery limit"
+
+[[param]]
+id = "REF_STEAM_UTILITY_T_H"
+value = 45.9
+unit = "t/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Estimated Utility Consumptions, Base case: HP steam from the hydrogen plant to the power island; a cross-check of stream 10 (46,053 kg/h, PDF p44). Both values are printed; the sheet header says REV. 0, April 2015, its footer FWI-110/15A Rev.1"
+locator = "Estimated Utility Consumptions, PDF p48"
+source_status = "primary"
+decision = "D19"
+name = "IEAGHG utility-sheet HP steam to the power island"
+
+[[param]]
+id = "REF_POWER_EXPORT_PRICE_RATIO"
+value = 1.0
+unit = "-"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 uses one electricity price, 80 EUR/MWh, for export and import: Table 1 (PDF p12) prints one electricity price, and Sheet 92 of 112 (PDF p229) applies it as the electricity selling price or cost. Ratio of the export price to the import price; the NUS-H2 electricity price itself is decision D22"
+locator = "Table 1, PDF p12; Sheet 92 of 112, PDF p229"
+source_status = "primary"
+decision = "D22"
+name = "Reference export to import electricity price ratio"
+
+[[param]]
+id = "REF_POWER_PRICE_EUR_MWH"
+value = 80.0
+unit = "EUR/MWh"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 1, Assumed prices for consumables, electricity; used only to check the report's own electricity revenue"
+locator = "Table 1, PDF p12"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG electricity price"
+
+[[param]]
+id = "REF_OPERATING_HOURS"
+value = 8322.0
+unit = "h/y"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Sheet 92 of 112, Yearly Operating hours = 8322 (also the technical design basis, PDF p7); used only to check the report's own electricity revenue"
+locator = "Sheet 92 of 112, PDF p229"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG yearly operating hours"
+
+[[param]]
+id = "REF_POWER_REVENUE_EUR_Y"
+value = 6603008.0
+unit = "EUR/y"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Table 4, Operating Cost, Base Case, Electricity Export / Import (printed as -6,603,008, a revenue); a check target of the power balance"
+locator = "Table 4, PDF p18"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG electricity export revenue"
+
+[[param]]
+id = "REF_PSA_H2_RECOVERY_RANGE"
+value = 0.90
+unit = "-"
+low = 0.85
+high = 0.90
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Sheet 14 of 112: typically 85 to 90% of the H2 in the PSA feed gas are recovered (also PDF p6). The range is printed to the whole percent, so the check accepts a recovery below 90.5%"
+locator = "Sheet 14 of 112, PDF p37"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG PSA hydrogen recovery range"
+
+[[param]]
+id = "SMR_ISLAND_POWER_ISLAND_TPC_EURM"
+value = 20.124
+unit = "EUR2014 M"
+group = "cost"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Sheet 85 of 112, Base case total plant cost, power island column (hydrogen plant 97.212, power island 20.124, utilities and balance of plant 53.616, total 170.952 M EUR). The existing island entries keep their text; the island includes this power island on both sides (decision D23)"
+locator = "Sheet 85 of 112, PDF p222"
+source_status = "primary"
+decision = "D23"
+name = "IEAGHG power island total plant cost"
+
+[[param]]
+id = "SMR_ISLAND_NUSH2_EXCLUDES_POWER_ISLAND"
+value = 0.0
+unit = "flag"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Decision D23: 0 keeps the whole island, power island included, on both sides of the comparison; 1 removes the power-island share of the island capital from the NUS-H2 side only, as a labelled sensitivity. The switch removes capital only; the island's maintenance, insurance and local taxes (Table 4, PDF p18) stay on both sides"
+locator = "decision D23"
+source_status = "primary"
+decision = "D23"
+name = "NUS-H2 side excludes the IEAGHG power island"
+
+[[param]]
+id = "SUBSIDY_SWEEP_STEP"
+value = 0.05
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Decision D20: definition C is swept over the shares k x 0.05 for k = 0 to 20, generated from the integer k; definitions A and B keep the four-point grid"
+locator = "decision D20"
+source_status = "primary"
+decision = "D20"
+name = "Subsidy share sweep step (definition C)"
+
+[[param]]
+id = "SUBSIDY_GAP_LIMIT_GROSS"
+value = 0.01
+unit = "-"
+group = "cost"
+class = "user_decision"
+rigour = "fixed_assumption"
+source = "Decision D20: largest gap between the ledger and the DCF cost as a share of the unsubsidised (gross) L5 cost, a separate check for definition C over the full sweep. SUBSIDY_GAP_LIMIT (decision D11, a share of the subsidised ledger cost) is unchanged"
+locator = "decision D20"
+source_status = "primary"
+decision = "D20"
+name = "Subsidy gap limit against the gross cost"
+
+[[param]]
+id = "REF_S01_T_C"
+value = 9.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, temperature"
+
+[[param]]
+id = "REF_S01_P_MPA"
+value = 7.00
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S01_KMOL_H"
+value = 1696.6
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, molar flow"
+
+[[param]]
+id = "REF_S01_KG_H"
+value = 30563.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, mass flow"
+
+[[param]]
+id = "REF_S01_Y_CO2"
+value = 0.0200
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_N2"
+value = 0.0089
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_CH4"
+value = 0.8900
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_C2H6"
+value = 0.0700
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, C2H6 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_C3H8"
+value = 0.0100
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, C3H8 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_NC4H10"
+value = 0.0010
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, NC4H10 mole fraction (wet)"
+
+[[param]]
+id = "REF_S01_Y_NC5H12"
+value = 0.0001
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 1 (Natural Gas From B.L.)"
+locator = "PDF p44, stream 1"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 1, NC5H12 mole fraction (wet)"
+
+[[param]]
+id = "REF_S02_T_C"
+value = 128.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 2 (Natural Gas feedstock to Hydrogen Plant)"
+locator = "PDF p44, stream 2"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 2, temperature"
+
+[[param]]
+id = "REF_S02_P_MPA"
+value = 3.71
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 2 (Natural Gas feedstock to Hydrogen Plant)"
+locator = "PDF p44, stream 2"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 2, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S02_KMOL_H"
+value = 1455.8
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 2 (Natural Gas feedstock to Hydrogen Plant)"
+locator = "PDF p44, stream 2"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 2, molar flow"
+
+[[param]]
+id = "REF_S02_KG_H"
+value = 26231.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 2 (Natural Gas feedstock to Hydrogen Plant)"
+locator = "PDF p44, stream 2"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 2, mass flow"
+
+[[param]]
+id = "REF_S03_T_C"
+value = 121.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 3 (Natural Gas fuel to burners)"
+locator = "PDF p44, stream 3"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 3, temperature"
+
+[[param]]
+id = "REF_S03_P_MPA"
+value = 0.50
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 3 (Natural Gas fuel to burners)"
+locator = "PDF p44, stream 3"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 3, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S03_KMOL_H"
+value = 240.4
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 3 (Natural Gas fuel to burners)"
+locator = "PDF p44, stream 3"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 3, molar flow"
+
+[[param]]
+id = "REF_S03_KG_H"
+value = 4332.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 3 (Natural Gas fuel to burners)"
+locator = "PDF p44, stream 3"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 3, mass flow"
+
+[[param]]
+id = "REF_S04_T_C"
+value = 500.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, temperature"
+
+[[param]]
+id = "REF_S04_P_MPA"
+value = 3.39
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S04_KMOL_H"
+value = 5514.0
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, molar flow"
+
+[[param]]
+id = "REF_S04_KG_H"
+value = 98874.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, mass flow"
+
+[[param]]
+id = "REF_S04_Y_CO2"
+value = 0.0053
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_H2"
+value = 0.0053
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, H2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_N2"
+value = 0.0023
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_CH4"
+value = 0.2350
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_C2H6"
+value = 0.0185
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, C2H6 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_C3H8"
+value = 0.0026
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, C3H8 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_NC4H10"
+value = 0.0003
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, NC4H10 mole fraction (wet)"
+
+[[param]]
+id = "REF_S04_Y_H2O"
+value = 0.7307
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 4 (Purified Feedstock to Pre-reformer)"
+locator = "PDF p44, stream 4"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 4, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_T_C"
+value = 320.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, temperature"
+
+[[param]]
+id = "REF_S05_P_MPA"
+value = 2.80
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S05_KMOL_H"
+value = 8370.3
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, molar flow"
+
+[[param]]
+id = "REF_S05_KG_H"
+value = 101667.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, mass flow"
+
+[[param]]
+id = "REF_S05_Y_CO2"
+value = 0.0492
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_Y_CO"
+value = 0.1156
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, CO mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_Y_H2"
+value = 0.5171
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, H2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_Y_N2"
+value = 0.0015
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_Y_CH4"
+value = 0.0238
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S05_Y_H2O"
+value = 0.2927
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 5 (HTS Reactor Inlet)"
+locator = "PDF p44, stream 5"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 5, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_T_C"
+value = 412.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, temperature"
+
+[[param]]
+id = "REF_S06_P_MPA"
+value = 2.77
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S06_KMOL_H"
+value = 8370.3
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, molar flow"
+
+[[param]]
+id = "REF_S06_KG_H"
+value = 101667.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, mass flow"
+
+[[param]]
+id = "REF_S06_Y_CO2"
+value = 0.1283
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_Y_CO"
+value = 0.0366
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, CO mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_Y_H2"
+value = 0.5961
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, H2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_Y_N2"
+value = 0.0015
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_Y_CH4"
+value = 0.0238
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S06_Y_H2O"
+value = 0.2137
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 6 (HTS Reactor Outlet)"
+locator = "PDF p44, stream 6"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 6, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_T_C"
+value = 35.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, temperature"
+
+[[param]]
+id = "REF_S07_P_MPA"
+value = 2.58
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S07_KMOL_H"
+value = 6596.9
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, molar flow"
+
+[[param]]
+id = "REF_S07_KG_H"
+value = 69711.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, mass flow"
+
+[[param]]
+id = "REF_S07_Y_CO2"
+value = 0.1627
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_Y_CO"
+value = 0.0464
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, CO mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_Y_H2"
+value = 0.7563
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, H2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_Y_N2"
+value = 0.0020
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_Y_CH4"
+value = 0.0302
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S07_Y_H2O"
+value = 0.0024
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 7 (PSA inlet)"
+locator = "PDF p44, stream 7"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 7, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_T_C"
+value = 28.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, temperature"
+
+[[param]]
+id = "REF_S08_P_MPA"
+value = 0.13
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S08_KMOL_H"
+value = 2106.3
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, molar flow"
+
+[[param]]
+id = "REF_S08_KG_H"
+value = 60658.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, mass flow"
+
+[[param]]
+id = "REF_S08_Y_CO2"
+value = 0.5095
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_Y_CO"
+value = 0.1454
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, CO mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_Y_H2"
+value = 0.2369
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, H2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_Y_N2"
+value = 0.0062
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_Y_CH4"
+value = 0.0945
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, CH4 mole fraction (wet)"
+
+[[param]]
+id = "REF_S08_Y_H2O"
+value = 0.0076
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 8 (PSA Tail gas)"
+locator = "PDF p44, stream 8"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 8, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S09_T_C"
+value = 136.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, temperature"
+
+[[param]]
+id = "REF_S09_P_MPA"
+value = 0.02
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S09_KMOL_H"
+value = 8659.4
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, molar flow"
+
+[[param]]
+id = "REF_S09_KG_H"
+value = 257698.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, mass flow"
+
+[[param]]
+id = "REF_S09_Y_CO2"
+value = 0.2123
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, CO2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S09_Y_N2"
+value = 0.6083
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, N2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S09_Y_O2"
+value = 0.0102
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, O2 mole fraction (wet)"
+
+[[param]]
+id = "REF_S09_Y_H2O"
+value = 0.1692
+unit = "mol/mol"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 9 (Flue gas to ATM)"
+locator = "PDF p44, stream 9"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 9, H2O mole fraction (wet)"
+
+[[param]]
+id = "REF_S10_T_C"
+value = 395.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 10 (HP Steam export)"
+locator = "PDF p44, stream 10"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 10, temperature"
+
+[[param]]
+id = "REF_S10_P_MPA"
+value = 4.23
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 10 (HP Steam export)"
+locator = "PDF p44, stream 10"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 10, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S10_KMOL_H"
+value = 2556.0
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 10 (HP Steam export)"
+locator = "PDF p44, stream 10"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 10, molar flow"
+
+[[param]]
+id = "REF_S10_KG_H"
+value = 46053.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 10 (HP Steam export)"
+locator = "PDF p44, stream 10"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 10, mass flow"
+
+[[param]]
+id = "REF_S11_T_C"
+value = 15.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 11 (Demi Water (make up) and steam turbine condensate)"
+locator = "PDF p44, stream 11"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 11, temperature"
+
+[[param]]
+id = "REF_S11_P_MPA"
+value = 0.60
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 11 (Demi Water (make up) and steam turbine condensate)"
+locator = "PDF p44, stream 11"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 11, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S11_KMOL_H"
+value = 5095.7
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 11 (Demi Water (make up) and steam turbine condensate)"
+locator = "PDF p44, stream 11"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 11, molar flow"
+
+[[param]]
+id = "REF_S11_KG_H"
+value = 91800.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 11 (Demi Water (make up) and steam turbine condensate)"
+locator = "PDF p44, stream 11"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 11, mass flow"
+
+[[param]]
+id = "REF_S12_T_C"
+value = 40.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 12 (Hydrogen to B.L)"
+locator = "PDF p44, stream 12"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 12, temperature"
+
+[[param]]
+id = "REF_S12_P_MPA"
+value = 2.50
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 12 (Hydrogen to B.L)"
+locator = "PDF p44, stream 12"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 12, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S12_KMOL_H"
+value = 4461.5
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 12 (Hydrogen to B.L)"
+locator = "PDF p44, stream 12"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 12, molar flow"
+
+[[param]]
+id = "REF_S12_KG_H"
+value = 8994.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 12 (Hydrogen to B.L)"
+locator = "PDF p44, stream 12"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 12, mass flow"
+
+[[param]]
+id = "REF_S13_T_C"
+value = 40.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 13 (H2 Recycle)"
+locator = "PDF p45, stream 13"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 13, temperature"
+
+[[param]]
+id = "REF_S13_P_MPA"
+value = 2.51
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 13 (H2 Recycle)"
+locator = "PDF p45, stream 13"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 13, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S13_KMOL_H"
+value = 29.1
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 13 (H2 Recycle)"
+locator = "PDF p45, stream 13"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 13, molar flow"
+
+[[param]]
+id = "REF_S13_KG_H"
+value = 59.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 13 (H2 Recycle)"
+locator = "PDF p45, stream 13"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 13, mass flow"
+
+[[param]]
+id = "REF_S14_T_C"
+value = 400.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 14 (HP Steam to process)"
+locator = "PDF p45, stream 14"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 14, temperature"
+
+[[param]]
+id = "REF_S14_P_MPA"
+value = 4.29
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 14 (HP Steam to process)"
+locator = "PDF p45, stream 14"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 14, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S14_KMOL_H"
+value = 5290.1
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 14 (HP Steam to process)"
+locator = "PDF p45, stream 14"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 14, molar flow"
+
+[[param]]
+id = "REF_S14_KG_H"
+value = 95301.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 14 (HP Steam to process)"
+locator = "PDF p45, stream 14"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 14, mass flow"
+
+[[param]]
+id = "REF_S15_T_C"
+value = 177.0
+unit = "C"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 15 (LP Steam To Deareator)"
+locator = "PDF p45, stream 15"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 15, temperature"
+
+[[param]]
+id = "REF_S15_P_MPA"
+value = 0.44
+unit = "MPa"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 15 (LP Steam To Deareator)"
+locator = "PDF p45, stream 15"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 15, pressure (gauge or absolute not marked)"
+
+[[param]]
+id = "REF_S15_KMOL_H"
+value = 30.0
+unit = "kmol/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 15 (LP Steam To Deareator)"
+locator = "PDF p45, stream 15"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 15, molar flow"
+
+[[param]]
+id = "REF_S15_KG_H"
+value = 540.0
+unit = "kg/h"
+group = "reference"
+class = "published"
+rigour = "fixed_assumption"
+source = "IEAGHG 2017-02 Heat and Material Balance, Base case (rev. 1, June 2015), stream 15 (LP Steam To Deareator)"
+locator = "PDF p45, stream 15"
+source_status = "primary"
+decision = "D18"
+name = "IEAGHG stream 15, mass flow"

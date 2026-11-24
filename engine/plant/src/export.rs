@@ -25,7 +25,7 @@
 //! on a Level 3 result read `flowsheet_m8`, and a sweep point that did not solve
 //! reads `not_converged` with empty results.
 
-use crate::anchored::{Balance, Case, CostLevel, Model, Route, Scenario};
+use crate::anchored::{Balance, CarbonSrc, Case, CostLevel, Model, Route, Scenario};
 use crate::carbon::carbon_kmol_h;
 use crate::dcf::DcfResult;
 use crate::drift::{self, TermRecord};
@@ -35,6 +35,9 @@ use crate::gates::Gates;
 use crate::heatrec::{self, SourceId};
 use crate::params::{ParamEntry, ParamSet};
 use crate::sens::{sweeps, FsInputs, FsPoint, SensRow};
+use crate::subsidy::{
+    round_up_share, BreakEven, Definition, GrantQuery, MethodEval, SubsidyEval, Timing,
+};
 use crate::terms::{Source, Term};
 use nush2_numerics::{EngineError, Result};
 use nush2_props::equilibrium::KSource;
@@ -44,6 +47,29 @@ use nush2_units::stream::{EnergyKind, ModelClass, Port, Sp};
 
 /// Status of every result row at this milestone.
 pub const STATUS: &str = "anchored_port";
+/// Status of a row whose carbon lines come from the plant's own stream ledger.
+pub const CARBON_STATUS: &str = "carbon_independent";
+
+/// Status word of a row by the basis of its carbon lines.
+fn carbon_status(src: CarbonSrc) -> &'static str {
+    match src {
+        CarbonSrc::Plant => CARBON_STATUS,
+        CarbonSrc::Anchored => STATUS,
+    }
+}
+
+/// Source text of a row by the basis of its carbon lines.
+fn carbon_source(src: CarbonSrc) -> &'static str {
+    match src {
+        CarbonSrc::Plant => "engine plant carbon ledger (Level 3 flowsheet, equations N.2 to N.10)",
+        CarbonSrc::Anchored => "engine anchored port",
+    }
+}
+
+/// True for the two statuses that mark a port row eligible for the preset word.
+fn is_port_status(s: &str) -> bool {
+    s == STATUS || s == CARBON_STATUS
+}
 /// Status of rows computed by the Level 3 flowsheet.
 pub const FLOWSHEET_STATUS: &str = "flowsheet_m7";
 /// Status of rows computed by the M8 models on real flows.
@@ -223,7 +249,7 @@ fn mark(head: String, anch: &str, word: Option<&str>) -> Result<String> {
         let hc = cells(h);
         let ac = cells(a);
         let differs = hc.len() != ac.len() || !same_cells(&hc[..hc.len() - 1], &ac[..ac.len() - 1]);
-        if i > 0 && differs && hc.last().map(String::as_str) == Some(STATUS) {
+        if i > 0 && differs && hc.last().is_some_and(|s| is_port_status(s)) {
             out.push_str(&with_status(h, word));
         } else {
             out.push_str(h);
@@ -250,7 +276,7 @@ fn mark_modelled(text: String, word: Option<&str>) -> String {
         let c = cells(line);
         let differs = c.len() > 8
             && c[0] == "B_REC_F_MODELLED"
-            && c.last().map(String::as_str) == Some(STATUS)
+            && c.last().is_some_and(|s| is_port_status(s))
             && anchored
                 .get(&c[1])
                 .is_some_and(|v| !same_cells(v, &c[5..8]));
@@ -306,7 +332,7 @@ pub const RUNS: [RunDef; 6] = [
     },
 ];
 
-/// The six tables the plant crate can build. Validation lives in `nush2_vv`.
+/// The seven tables the plant crate can build. Validation lives in `nush2_vv`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tables {
     pub final_design_basis: String,
@@ -315,6 +341,7 @@ pub struct Tables {
     pub emissions_ledger: String,
     pub economic_ledger: String,
     pub sensitivity_results: String,
+    pub subsidy_scenarios: String,
 }
 
 /// CSV text builder with `\n` line ends.
@@ -397,7 +424,7 @@ fn run_def(id: &str) -> Result<RunDef> {
 }
 
 fn balance_for(m: &Model, r: &RunDef) -> Result<Balance> {
-    m.balance(r.scn, &m.opts(m.scale(r.case)))
+    m.plant_balance(r.scn, &m.opts(m.scale(r.case)))
 }
 
 /// All tables from one parameter set on the recorded gates.
@@ -452,6 +479,7 @@ pub fn tables_with(p: &ParamSet, gates: &Gates) -> Result<Tables> {
             &sensitivity(p, &fsx, &cryo)?,
             hw,
         )?,
+        subsidy_scenarios: mark(subsidy_scenarios(&mh)?, &subsidy_scenarios(&m0)?, hw)?,
     })
 }
 
@@ -534,11 +562,12 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
         "status",
     ]);
     for e in p.entries() {
-        input_row(&mut c, e);
+        input_row(&mut c, e, input_role_note(m, &e.id));
     }
     let mut rows: Vec<ResultRow> = Vec::new();
     results_block(m, &mut rows)?;
     dcf_block(m, &mut rows)?;
+    reference_cost_block(m, &mut rows)?;
     term_block(rec, &mut rows);
     level4_block(rec, &mut rows);
     tube_block(&mut rows)?;
@@ -546,7 +575,16 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
     drift_block(p, rec, &mut rows)?;
     rows.sort_by(|a, b| a.id.cmp(&b.id));
     for r in rows {
-        let status = row_status(&r.id, marks);
+        let plant_row = r.group == "carbon"
+            || matches!(
+                r.id.as_str(),
+                "RES_NG_MMSCFD" | "RES_NG_UNABATED_MMSCFD" | "RES_SOLVENT_T_H"
+            );
+        let status = if m.carbon_params.independent() && plant_row {
+            CARBON_STATUS.to_string()
+        } else {
+            row_status(&r.id, marks)
+        };
         c.row(&[
             r.id,
             t(r.group),
@@ -570,7 +608,27 @@ fn final_design_basis(p: &ParamSet, m: &Model, rec: &TermRecord, marks: &Marks) 
     Ok(c.out)
 }
 
-fn input_row(c: &mut Csv, e: &ParamEntry) {
+/// Role of an input on the independent basis, appended to its source text. The
+/// steam export and the purchased power of INL's conventional plant price the
+/// LOST_STEAM and BASE_POWER lines; no source gives the duty of a plant-built
+/// reference, so the two numbers are comparison inputs and not part of the
+/// plant's own balance. The legacy export keeps its committed text.
+fn input_role_note(m: &Model, id: &str) -> Option<&'static str> {
+    if !m.carbon_params.independent() {
+        return None;
+    }
+    match id {
+        "EXPORT_STEAM_CONV" | "E_CONV_NOCC" => Some(
+            "role on the independent basis: comparison input that prices the LOST_STEAM and \
+             BASE_POWER lines on INL's conventional plant, because no source gives the steam \
+             duty or the power of a plant-built reference; Final_Design_Basis.csv prints the \
+             cost with and without the two lines",
+        ),
+        _ => None,
+    }
+}
+
+fn input_row(c: &mut Csv, e: &ParamEntry, role: Option<&str>) {
     let (b, a) = scope(&e.id);
     let v = exact(e.value);
     c.row(&[
@@ -589,7 +647,10 @@ fn input_row(c: &mut Csv, e: &ParamEntry) {
         e.high.map(exact).unwrap_or_default(),
         e.class.clone(),
         e.rigour.clone(),
-        e.source.clone(),
+        match role {
+            Some(r) => format!("{}; {r}", e.source),
+            None => e.source.clone(),
+        },
         e.locator.clone(),
         e.source_status.clone(),
         String::new(),
@@ -601,9 +662,9 @@ fn input_row(c: &mut Csv, e: &ParamEntry) {
 /// eq: K.6
 /// eq: K.22
 fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
-    let sb = m.case_summary(Scenario::RecF, m.s_b)?;
-    let sa_inl = m.case_summary(Scenario::InlSel, 1.0)?;
-    let sa_mea = m.case_summary(Scenario::RecF, 1.0)?;
+    let sb = m.plant_summary(Scenario::RecF, m.s_b)?;
+    let sa_inl = m.plant_summary(Scenario::InlSel, 1.0)?;
+    let sa_mea = m.plant_summary(Scenario::RecF, 1.0)?;
     // id, summary key, group, unit, equation, decision
     let keys: [(&str, &str, &str, &str, &str, &str); 44] = [
         ("RES_H2_KG_H", "h2_kg_h", "production", "kg/h", "J.2", "D03"),
@@ -855,7 +916,19 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         ),
     ];
     for (id, key, group, unit, equation, decision) in keys {
-        let parameter = if id == "RES_ABATEMENT_IEAGHG_T_Y" {
+        let parameter = if m.carbon_params.independent() && id == "RES_ABATEMENT_T_Y" {
+            format!(
+                "Net abatement after transport and storage against the generic reference intensity (central), {}",
+                m.carbon_params.baseline.id()
+            )
+        } else if m.carbon_params.independent() && id == "RES_BASELINE_T_Y" {
+            format!(
+                "Unabated reference, central generic reference intensity: {} times the annual hydrogen",
+                m.carbon_params.baseline.id()
+            )
+        } else if m.carbon_params.independent() && id == "RES_NG_UNABATED_MMSCFD" {
+            "Natural gas of the unabated reference plant, implied by the central intensity".into()
+        } else if id == "RES_ABATEMENT_IEAGHG_T_Y" {
             format!(
                 "Abatement on the IEAGHG bound of {:.6} kg/kg, unrounded: 0.8091 kg CO2/Nm3 over \
                  0.08994 kg H2/Nm3, IEAGHG 2017-02 Table 2",
@@ -875,6 +948,71 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
             equation,
             decision,
         });
+    }
+    for (id, key, unit, eq, what) in [
+        (
+            "RES_ABATEMENT_DIRECT_T_Y",
+            "A_dir_t_y",
+            "t/y",
+            "N.9.1",
+            "Direct abatement against the generic reference intensity (central), before transport and storage",
+        ),
+        (
+            "RES_TS_EMISSION_T_Y",
+            "ts_emission_t_y",
+            "t/y",
+            "N.9.4",
+            "CO2 emitted by conditioning, shipping, injection and storage operations",
+        ),
+        (
+            "RES_TS_RATIO",
+            "tau_ts",
+            "t/t",
+            "N.9.4",
+            "Transport and storage emissions per tonne of CO2 delivered",
+        ),
+        (
+            "RES_STACK_T_Y",
+            "stack_t_y",
+            "t/y",
+            "N.5.2",
+            "Stack CO2 of the burned nitrogen-rich cut",
+        ),
+        (
+            "RES_COND_VENTED_T_Y",
+            "cond_vented_t_y",
+            "t/y",
+            "N.5.2",
+            "Condensate CO2 that reaches the air",
+        ),
+        (
+            "RES_ABATEMENT_PER_KG",
+            "A_net_per_kg",
+            "kg/kg",
+            "N.10.1",
+            "Net abatement per kg of hydrogen",
+        ),
+        (
+            "RES_CARBON_CLOSURE_REL",
+            "closure_rel",
+            "-",
+            "N.10.4",
+            "Relative carbon residual on the modelled streams",
+        ),
+    ] {
+        if sb.contains_key(key) {
+            rows.push(ResultRow {
+                id: id.to_string(),
+                group: "carbon",
+                parameter: what.to_string(),
+                b: sb.get(key).copied(),
+                a_inl: sa_inl.get(key).copied(),
+                a_mea: sa_mea.get(key).copied(),
+                unit,
+                equation: eq,
+                decision: "D07",
+            });
+        }
     }
     let one =
         |id: &str, parameter: String, v: f64, unit: &'static str, eq: &'static str| ResultRow {
@@ -927,7 +1065,11 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
     let ng_u = get("ng_unabated_mmscfd");
     rows.push(one(
         "RES_GAS_SAVING_INL",
-        "Gas saved against the unabated SMR on the INL pair".into(),
+        if m.carbon_params.independent() {
+            "Gas saved against the unabated reference implied by the central intensity".into()
+        } else {
+            "Gas saved against the unabated SMR on the INL pair".into()
+        },
         1.0 - ng_b / ng_u,
         "-",
         "L.16",
@@ -1016,8 +1158,8 @@ fn results_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         equation: "J.6",
         decision: "",
     });
-    let bb = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&bb.c, m.s_b).a_atm;
+    let bb = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&bb.c, m.s_b).a_net;
     rows.push(ResultRow {
         id: "RES_TARGET_ABATEMENT_MARGIN_T_Y".into(),
         group: "cost",
@@ -1105,7 +1247,7 @@ pub fn dcf_grid(m: &Model, b: &Balance) -> Result<Vec<(DcfResult, f64)>> {
         for life in [m.lives[0], m.lives[2]] {
             for n in [m.n_linear, m.n_team, m.n_ngnp] {
                 let q = CostQuery::central(stage, life, n, m.r_rated);
-                let l3 = m.ledger(b, &q)?.l3() * 1e6 / m.emissions(&b.c, b.s).a_atm;
+                let l3 = m.ledger(b, &q)?.l3() * 1e6 / m.emissions(&b.c, b.s).a_net;
                 out.push((m.dcf(b, &q)?, l3));
             }
         }
@@ -1113,16 +1255,34 @@ pub fn dcf_grid(m: &Model, b: &Balance) -> Result<Vec<(DcfResult, f64)>> {
     Ok(out)
 }
 
+/// Words that tie a cost per tonne to the reference it is divided by. On the
+/// independent basis the abatement is measured against a generic reference
+/// intensity and not against a plant-built reference (decision D2), and the
+/// cost rows say so. Empty on the legacy basis, whose committed text is
+/// unchanged.
+fn reference_words(m: &Model) -> &'static str {
+    if m.carbon_params.independent() {
+        ", abatement against the generic reference intensity"
+    } else {
+        ""
+    }
+}
+
 fn dcf_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
     for (d, l3) in dcf_grid(m, &b)? {
         let tag = format!("{}_{}Y_{}", d.stage.id(), d.life_y, n_tag(d.n));
         let mut add = |prefix: &str, name: &str, v: f64, unit: &'static str, eq: &'static str| {
+            let per_t = if unit == "S$/t" {
+                reference_words(m)
+            } else {
+                ""
+            };
             rows.push(ResultRow {
                 id: format!("{prefix}_{tag}"),
                 group: "cost",
                 parameter: format!(
-                    "{name}, {}, {} y, n = {:.2}, 210 MWth charged",
+                    "{name}, {}, {} y, n = {:.2}, 210 MWth charged{per_t}",
                     d.stage.id(),
                     d.life_y,
                     d.n
@@ -1152,6 +1312,150 @@ fn dcf_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
         add("LAC_DCF", "Levelised abatement cost", d.lac, "S$/t", "L.36");
         add("AC_L5", "Ledger abatement cost at L5", d.l5, "S$/t", "L.26");
         add("AC_L3", "Ledger abatement cost at L3", l3, "S$/t", "L.26");
+    }
+    Ok(())
+}
+
+/// The cost under the plant-built reference and without the two system lines,
+/// printed beside the AC_L5 and LAC_DCF rows they qualify (independent basis
+/// only; the legacy basis has no plant-built reference).
+///
+/// The plant-built reference is the floor of N.7.1 and N.7.3: the same
+/// flowsheet without capture, recycle or firing gas, so its gas and emission
+/// are the lowest the plant's own balance supports. The central rows use the
+/// generic reference intensity (decision D2). Pricing the floor's gas and
+/// dividing by the abatement against it gives the other end of the range.
+///
+/// The LOST_STEAM and BASE_POWER lines price INL's conventional plant, scaled.
+/// The rows `NOSYS_*` drop both and `SYSLINES_*` is the cost per tonne they add.
+///
+/// eq: N.7.1
+/// eq: N.7.3
+/// eq: L.24
+/// eq: S.7e
+fn reference_cost_block(m: &Model, rows: &mut Vec<ResultRow>) -> Result<()> {
+    if !m.carbon_params.independent() {
+        return Ok(());
+    }
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let Some(fl) = m.floor_reference(&b, b.s)? else {
+        return Ok(());
+    };
+    let a = m.emissions(&b.c, b.s).a_net;
+    let timing = m.subsidy.default_timing;
+    let n = m.n_linear;
+    let mut add =
+        |id: String, name: String, v: Option<f64>, unit: &'static str, eq: &'static str| {
+            rows.push(ResultRow {
+                id,
+                group: "cost",
+                parameter: name,
+                b: v,
+                a_inl: None,
+                a_mea: None,
+                unit,
+                equation: eq,
+                decision: "",
+            });
+        };
+    let floor_note = format!(
+        "plant-built reference without firing gas, a floor of {:.6} kg/kg",
+        fl.kg_kg
+    );
+    let lines =
+        "without the LOST_STEAM and BASE_POWER lines (INL conventional plant, comparison input)";
+    for stage in Stage::ALL {
+        for life in [m.lives[0], m.lives[2]] {
+            let q = CostQuery::central(stage, life, n, m.r_rated);
+            let tag = format!("{}_{}Y_{}", stage.id(), life, n_tag(n));
+            let case = format!("{}, {} y, n = {:.2}, 210 MWth charged", stage.id(), life, n);
+            // Under the plant-built reference: its gas is priced and its
+            // abatement divides the cost.
+            let qf = CostQuery {
+                ng_smr: Some(fl.gas_mmscfd),
+                ..q
+            };
+            add(
+                format!("FLOOR_L5_{tag}"),
+                format!("Ledger abatement cost at L5, {case}, {floor_note}"),
+                Some(m.ledger(&b, &qf)?.l5() * 1e6 / fl.a_net),
+                "S$/t",
+                "L.26",
+            );
+            add(
+                format!("FLOOR_LAC_DCF_{tag}"),
+                format!("Levelised abatement cost, {case}, {floor_note}"),
+                Some(m.dcf_at(&b, &qf, fl.a_net)?.lac),
+                "S$/t",
+                "L.36",
+            );
+            for definition in Definition::ALL {
+                let be = m.breakeven(&b, &qf, definition, timing, fl.a_net)?;
+                for (suffix, name, share) in [
+                    ("L5", "ledger", be.l5.result.share()),
+                    ("DCF", "discounted cash flow", be.dcf.result.share()),
+                    ("BOTH", "both methods", be.both.share()),
+                ] {
+                    add(
+                        format!(
+                            "FLOOR_BREAKEVEN_{}_{suffix}_{}_{}Y",
+                            definition.id(),
+                            stage.id(),
+                            life
+                        ),
+                        format!(
+                            "Break-even grant share, definition {}, {name}, {} grant, {case}, {floor_note}; empty when no share up to the maximum meets the target",
+                            definition.id(),
+                            timing.id()
+                        ),
+                        share,
+                        "-",
+                        "S.7e",
+                    );
+                }
+            }
+            // Without the two lines that price INL's conventional plant.
+            let qn = CostQuery {
+                system_lines: false,
+                ..q
+            };
+            let l5 = m.ledger(&b, &q)?.l5() * 1e6 / a;
+            let l5_n = m.ledger(&b, &qn)?.l5() * 1e6 / a;
+            let d = m.dcf(&b, &q)?.lac;
+            let d_n = m.dcf(&b, &qn)?.lac;
+            add(
+                format!("NOSYS_L5_{tag}"),
+                format!("Ledger abatement cost at L5, {case}, {lines}"),
+                Some(l5_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("NOSYS_LAC_DCF_{tag}"),
+                format!("Levelised abatement cost, {case}, {lines}"),
+                Some(d_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("SYSLINES_L5_{tag}"),
+                format!(
+                    "Cost per tonne at L5 that the LOST_STEAM and BASE_POWER lines add, {case}"
+                ),
+                Some(l5 - l5_n),
+                "S$/t",
+                "L.24",
+            );
+            add(
+                format!("SYSLINES_LAC_DCF_{tag}"),
+                format!(
+                    "Levelised cost per tonne that the LOST_STEAM and BASE_POWER lines add, {case}"
+                ),
+                Some(d - d_n),
+                "S$/t",
+                "L.24",
+            );
+        }
     }
     Ok(())
 }
@@ -1804,6 +2108,10 @@ fn anchored_mass_run(
     let s = m.scale(r.case);
     let b = balance_for(m, &r)?;
     let k = b.c;
+    let vented_condensate = match k.src {
+        CarbonSrc::Plant => m.carbon_params.cond_vent * k.cond,
+        CarbonSrc::Anchored => 0.0,
+    };
     let h2_kmol = m.h2_a_kgh * s * k.h_scale / MW_H2;
     let h2_feed = h2_kmol / m.psa_rec;
     let cap = k.cap * s;
@@ -1865,7 +2173,9 @@ fn anchored_mass_run(
             },
             co2: None,
             ch4: None,
-            carbon: Some(k.burn * s),
+            // The cut alone: the vented condensate CO2 of the plant's ledger sits
+            // in `burn` for the site total and is not part of this stream.
+            carbon: Some((k.burn - vented_condensate) * s),
             rigour: "reduced_order",
         },
         S {
@@ -1989,8 +2299,13 @@ fn anchored_mass_run(
             opt(x.carbon),
             t("calculated"),
             t(x.rigour),
-            t("engine anchored port, carbon ledger J.8 to J.11"),
-            t(STATUS),
+            t(match k.src {
+                CarbonSrc::Plant => {
+                    "engine plant carbon ledger, Level 3 flowsheet run at the hydrogen target"
+                }
+                CarbonSrc::Anchored => "engine anchored port, carbon ledger J.8 to J.11",
+            }),
+            t(carbon_status(k.src)),
         ]);
     }
     let env = fs_run
@@ -2016,7 +2331,7 @@ fn anchored_mass_run(
             "CLOSURE_CARBON",
             "Carbon residual",
             Some(k.closure * s),
-            STATUS,
+            carbon_status(k.src),
             23,
         ),
         (
@@ -2967,15 +3282,60 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
     let s = m.scale(r.case);
     let b = balance_for(m, &r)?;
     let e = m.emissions(&b.c, s);
+    let src = b.c.src;
+    let status = carbon_status(src);
+    let source = carbon_source(src);
     let h2 = m.h2_a_kgh * s * b.c.h_scale * m.hours / 1000.0;
     let per_pass = if r.scn == Scenario::InlSel {
         m.eta_sel
     } else {
         m.eta_mea
     };
-    let plant = e.captured / (e.captured + e.atm);
+    // Plant capture: carbon stored over fresh carbon on the plant's ledger
+    // (equation N.3.2), the share of stored over stored plus emitted on the
+    // anchored one.
+    let plant = match src {
+        CarbonSrc::Plant => b.c.cap / b.c.f,
+        CarbonSrc::Anchored => e.captured / (e.captured + e.atm),
+    };
     let sys = m.system_adjust(&b, s);
-    let lc = m.lifecycle_terms(&b, s, b.r);
+    let lc = m.lifecycle_terms(&b, s, b.r)?;
+    let abatement_name = match src {
+        CarbonSrc::Plant => "Direct abatement",
+        CarbonSrc::Anchored => "Net abatement",
+    };
+    // The lifecycle views add CO2e terms (the upstream gas factor and the nuclear
+    // factor) to CO2 lines. On the independent basis every row of these views
+    // says so, with the horizon and the source of each CO2e term (decision D4).
+    // The legacy rows keep the wording of the committed tables.
+    let (nuc_name, ts_name, burden_total, up_name, up_total, lc_source) = match src {
+        CarbonSrc::Plant => (
+            "Nuclear lifecycle burden, CO2e (UNECE 2021 range through a secondary summary, warming-potential horizon not stated)"
+                .to_string(),
+            "T&S burden, CO2".to_string(),
+            "Net abatement with the nuclear lifecycle burden, CO2e total".to_string(),
+            format!(
+                "Saved upstream gas, CO2e (GWP100 = {}, IEA 2026, global gas supply mix)",
+                m.gwp_up
+            ),
+            format!(
+                "Net abatement with saved upstream gas and the nuclear lifecycle burden, CO2e total (GWP100 = {} for the upstream term)",
+                m.gwp_up
+            ),
+            format!(
+                "{}; CO2e terms: upstream gas factor EF_UPSTREAM (IEA 2026, GWP100 = {}) and nuclear factor EF_NUCLEAR (UNECE 2021 range, horizon not stated)",
+                source, m.gwp_up
+            ),
+        ),
+        CarbonSrc::Anchored => (
+            "Nuclear lifecycle burden".to_string(),
+            "T&S burden".to_string(),
+            "Net abatement".to_string(),
+            "Saved upstream gas".to_string(),
+            "Net abatement".to_string(),
+            source.to_string(),
+        ),
+    };
     for (bid, base) in [
         ("CHO_9p35", m.base_cho * h2),
         ("IEAGHG_9p00", m.base_ieaghg * h2),
@@ -2990,23 +3350,18 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                     ("BASELINE", "Unabated SMR baseline", base, "K.3"),
                     ("CAPTURED", "Captured and stored", e.captured, "K.7"),
                     ("N2_RICH_CUT", "Residual to atmosphere", e.atm, "K.8"),
-                    ("ABATEMENT", "Net abatement", a, "K.11"),
+                    ("ABATEMENT", abatement_name, a, "K.11"),
                 ],
             ),
             (
                 "lifecycle_burdens",
                 vec![
-                    (
-                        "NUCLEAR_LC",
-                        "Nuclear lifecycle burden",
-                        -lc.nuclear,
-                        "K.19",
-                    ),
-                    ("TS_BURDEN", "T&S burden", -lc.ts_burden, "K.19"),
+                    ("NUCLEAR_LC", nuc_name.as_str(), -lc.nuclear_co2e, "K.19"),
+                    ("TS_BURDEN", ts_name.as_str(), -lc.ts_burden, "K.19"),
                     (
                         "ABATEMENT",
-                        "Net abatement",
-                        a - lc.nuclear - lc.ts_burden,
+                        burden_total.as_str(),
+                        a - lc.nuclear_co2e - lc.ts_burden,
                         "K.19",
                     ),
                 ],
@@ -3016,32 +3371,39 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                 vec![
                     (
                         "UPSTREAM_CREDIT",
-                        "Saved upstream gas",
-                        lc.up_credit,
+                        up_name.as_str(),
+                        lc.up_credit_co2e,
                         "K.19",
                     ),
-                    (
-                        "NUCLEAR_LC",
-                        "Nuclear lifecycle burden",
-                        -lc.nuclear,
-                        "K.19",
-                    ),
-                    ("TS_BURDEN", "T&S burden", -lc.ts_burden, "K.19"),
+                    ("NUCLEAR_LC", nuc_name.as_str(), -lc.nuclear_co2e, "K.19"),
+                    ("TS_BURDEN", ts_name.as_str(), -lc.ts_burden, "K.19"),
                     (
                         "ABATEMENT",
-                        "Net abatement",
-                        a + lc.up_credit - lc.nuclear - lc.ts_burden,
+                        up_total.as_str(),
+                        a + lc.up_credit_co2e - lc.nuclear_co2e - lc.ts_burden,
                         "K.19",
                     ),
                 ],
             ),
             (
                 "system",
-                vec![("ABATEMENT", "Net abatement", a + sys, "K.18")],
+                vec![(
+                    "ABATEMENT",
+                    "Net abatement",
+                    a + sys - e.ts_emission,
+                    "K.18",
+                )],
             ),
         ];
         for (view, lines) in views {
             for (lid, name, v, eq) in lines {
+                // The transport and storage burden is CO2 and keeps the plain
+                // ledger source; every other lifecycle line names its CO2e terms.
+                let view_source = if view.starts_with("lifecycle_") && lid != "TS_BURDEN" {
+                    lc_source.as_str()
+                } else {
+                    source
+                };
                 c.row(&[
                     t(run_id),
                     t(bid),
@@ -3053,17 +3415,257 @@ fn emissions_run(c: &mut Csv, m: &Model, r: &RunDef, run_id: &str) -> Result<()>
                     num(per_pass),
                     num(plant),
                     t("calculated"),
-                    t("engine anchored port"),
+                    t(view_source),
                     t(eq),
-                    t(STATUS),
+                    t(status),
                 ]);
             }
         }
     }
+    if src == CarbonSrc::Plant {
+        independent_lines(c, m, run_id, &b, per_pass, plant)?;
+    }
     Ok(())
 }
 
-/// Class, source, source status and equation of each ledger line.
+/// Lines of the independent carbon view of one run: the annual quantities of the
+/// plant's own ledger, the transport and storage emissions by source, the direct
+/// and net abatement against each reference, the reduction, the intensity and the
+/// closure of the carbon account. The decomposition of the central abatement
+/// (equation N.9.2) closes the view.
+fn independent_lines(
+    c: &mut Csv,
+    m: &Model,
+    run_id: &str,
+    b: &Balance,
+    per_pass: f64,
+    plant: f64,
+) -> Result<()> {
+    let s = b.s;
+    let ab = m.abatement(b, s)?;
+    let h2 = ab.h2_t_y;
+    let view = "independent_carbon";
+    let mut line = |bid: &str, id: &str, name: String, v: f64, per_kg: bool, eq: &str| {
+        c.row(&[
+            t(run_id),
+            t(bid),
+            t(view),
+            t(id),
+            t(&name),
+            // Residuals and the tolerance are far below the six decimals of `num`.
+            if eq == "N.10.4" || eq == "N.6.1" {
+                sci6(v)
+            } else {
+                num(v)
+            },
+            if per_kg { num(v / h2) } else { String::new() },
+            num(per_pass),
+            num(plant),
+            t("calculated"),
+            t(carbon_source(CarbonSrc::Plant)),
+            t(eq),
+            t(CARBON_STATUS),
+        ]);
+    };
+    line(
+        "PLANT",
+        "CAPTURED",
+        "CO2 delivered to storage".into(),
+        ab.captured_t_y,
+        true,
+        "N.9.3",
+    );
+    line(
+        "PLANT",
+        "STACK",
+        "Stack CO2 of the burned cut".into(),
+        ab.stack_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "COND_VENT",
+        format!(
+            "Condensate CO2 vented, share {:.2}",
+            m.carbon_params.cond_vent
+        ),
+        ab.cond_vented_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "RESIDUAL_DIRECT",
+        "Residual direct emission, modelled streams only".into(),
+        ab.residual_direct_t_y,
+        true,
+        "N.5.2",
+    );
+    line(
+        "PLANT",
+        "TS_EMISSIONS",
+        "Transport and storage emissions".into(),
+        ab.ts_emission_t_y,
+        true,
+        "N.9.4",
+    );
+    for (id, part) in ab.ts.lines() {
+        line(
+            "PLANT",
+            id,
+            format!("{id} per tonne delivered times the stored CO2"),
+            part * ab.captured_t_y,
+            true,
+            "N.9.4",
+        );
+    }
+    line(
+        "PLANT",
+        "TS_RATIO",
+        "Transport and storage emissions per tonne delivered, t/t".into(),
+        ab.tau_ts,
+        false,
+        "N.9.4",
+    );
+    for row in &ab.rows {
+        let tag = if row.id == ab.central {
+            " (central, generic reference intensity)"
+        } else {
+            ""
+        };
+        line(
+            row.id,
+            "BASELINE_INDEP",
+            format!("Unabated reference{tag}"),
+            row.e_ref_t_y,
+            true,
+            "N.7.3",
+        );
+        line(
+            row.id,
+            "ABATEMENT_DIRECT",
+            format!("Direct abatement{tag}"),
+            row.a_direct,
+            true,
+            "N.9.1",
+        );
+        line(
+            row.id,
+            "ABATEMENT_NET",
+            format!("Net abatement after transport and storage{tag}"),
+            row.a_net,
+            true,
+            "N.9.4",
+        );
+        line(
+            row.id,
+            "REDUCTION",
+            format!("Share of the reference emission avoided{tag}"),
+            row.reduction,
+            false,
+            "N.10.2",
+        );
+    }
+    line(
+        "PLANT",
+        "INTENSITY",
+        "Direct CO2 per kg of hydrogen".into(),
+        ab.intensity_kg_kg,
+        false,
+        "N.10.3",
+    );
+    let cl = &ab.closure;
+    let tpy = m.tpy(1.0, s);
+    if let (Some(abs), Some(rel)) = (cl.residual_modelled, cl.relative_modelled) {
+        let unknown = if cl.unknown.is_empty() {
+            "none".to_string()
+        } else {
+            cl.unknown.join(" ")
+        };
+        line(
+            "PLANT",
+            "CLOSURE_ABS",
+            format!(
+                "Carbon residual on the modelled streams, verdict {}; whole account {}; unknown streams {unknown}",
+                cl.on_modelled.label(),
+                cl.overall.label()
+            ),
+            abs * tpy,
+            false,
+            "N.10.4",
+        );
+        line(
+            "PLANT",
+            "CLOSURE_REL",
+            "Relative carbon residual on the modelled streams".into(),
+            rel,
+            false,
+            "N.10.4",
+        );
+    }
+    line(
+        "PLANT",
+        "CLOSURE_TOL",
+        "Closure tolerance".into(),
+        cl.tol,
+        false,
+        "N.6.1",
+    );
+    if let Some(d) = ab.decomposition {
+        line(
+            "PLANT",
+            "DECOMP_CAPTURED",
+            "Abatement from captured CO2".into(),
+            d.captured,
+            true,
+            "N.9.2",
+        );
+        line(
+            "PLANT",
+            "DECOMP_AVOIDED_GAS",
+            "Abatement from the gas not bought".into(),
+            d.avoided_gas,
+            true,
+            "N.9.2",
+        );
+        line(
+            "PLANT",
+            "DECOMP_CONDENSATE",
+            "Condensate term".into(),
+            d.condensate,
+            true,
+            "N.9.2",
+        );
+    }
+    Ok(())
+}
+
+// Class, source, source status and equation of each ledger line.
+/// Line text of a ledger row. On the independent basis the three lines that
+/// depend on the reference plant say which reference they price: the GAS line
+/// the gas that the generic reference intensity implies, and the LOST_STEAM and
+/// BASE_POWER lines the conventional plant of INL, a comparison input because
+/// no source gives the duty of a plant-built reference. The legacy text is
+/// unchanged.
+fn ledger_line_text(m: &Model, src: CarbonSrc, id: &str, line: &str) -> String {
+    if !m.carbon_params.independent() {
+        return line.to_string();
+    }
+    match id {
+        // A run on the anchored carbon (B_REC_FIX) keeps INL's gas.
+        "GAS" if src == CarbonSrc::Plant => {
+            "Gas saved against the unabated reference (gas implied by the generic reference intensity)"
+                .to_string()
+        }
+        "LOST_STEAM" => "Lost steam export (INL conventional plant, comparison input)".to_string(),
+        "BASE_POWER" => {
+            "Baseline purchased power avoided (INL conventional plant, comparison input)".to_string()
+        }
+        _ => line.to_string(),
+    }
+}
+
 fn line_meta(id: &str) -> (&'static str, &'static str, &'static str, &'static str) {
     match id {
         "GAS" => (
@@ -3178,7 +3780,7 @@ fn economic_ledger(m: &Model) -> Result<String> {
     let exponents = [m.n_linear, m.n_team, m.n_ngnp];
     for r in RUNS {
         let b = balance_for(m, &r)?;
-        let a = m.emissions(&b.c, b.s).a_atm;
+        let a = m.emissions(&b.c, b.s).a_net;
         let headline = r.id == "B_REC_F";
         let stages: Vec<Stage> = if headline {
             Stage::ALL.to_vec()
@@ -3238,7 +3840,7 @@ fn economic_ledger(m: &Model) -> Result<String> {
                                 format!("{rc:.2}"),
                                 t(LEVELS[rung]),
                                 t(id),
-                                t(line),
+                                ledger_line_text(m, b.c.src, id, line),
                                 num(v),
                                 num(lo_l[i].2),
                                 num(hi_l[i].2),
@@ -3344,6 +3946,263 @@ fn economic_ledger(m: &Model) -> Result<String> {
                 t(unit),
                 t(STATUS),
             ]);
+        }
+    }
+    Ok(c.out)
+}
+
+/// Columns of `Subsidy_Scenarios.csv`.
+const SUBSIDY_HEADER: [&str; 35] = [
+    "run_id",
+    "stage",
+    "life_y",
+    "n",
+    "reactor_charged_mwth",
+    "definition",
+    "timing",
+    "default_case",
+    "row_kind",
+    "method",
+    "share",
+    "breakeven_case",
+    "total_capital_sgdm",
+    "eligible_capital_sgdm",
+    "grant_sgdm",
+    "private_capital_sgdm",
+    "interest_gross_sgdm",
+    "interest_private_sgdm",
+    "interest_saved_sgdm",
+    "annual_cost_gross_sgdm_y",
+    "annual_cost_net_sgdm_y",
+    "abatement_t_y",
+    "cost_gross_s_per_t",
+    "cost_net_s_per_t",
+    "target_s_per_t",
+    "target_met",
+    "public_outlay_s_per_t",
+    "state_pv_sgdm",
+    "gap_to_l5_s_per_t",
+    "gap_share_of_l5",
+    "class",
+    "source",
+    "source_status",
+    "equation",
+    "status",
+];
+
+/// Source text of the co-funding rows.
+const SUBSIDY_SOURCE: &str = "Co-funding model, equations S.1 to S.9c of the cost and subsidy \
+     derivation; cost items as in Economic_Ledger.csv";
+
+/// Decimals printed for a share. A break-even share is rounded up in the last one,
+/// so the printed share lies on the passing side of the infimum (equation S.7e).
+const SHARE_DECIMALS: i32 = 6;
+
+/// One row of the co-funding table: a method at one grant, or a break-even share.
+struct SubsidyRow<'a> {
+    stage: Stage,
+    life: f64,
+    n: f64,
+    charged: f64,
+    default_case: bool,
+    kind: &'static str,
+    method: &'static str,
+    case: &'static str,
+    equation: &'static str,
+    eval: &'a SubsidyEval,
+    /// The method's quantities; `None` on a row for both methods together.
+    cells: Option<&'a MethodEval>,
+    /// Source text of the row.
+    source: &'a str,
+}
+
+fn subsidy_row(c: &mut Csv, r: &SubsidyRow<'_>) {
+    let p = &r.eval.plan;
+    let by = |f: &dyn Fn(&MethodEval) -> f64| r.cells.map(f).map(num).unwrap_or_default();
+    let met = r.cells.map_or(r.eval.target_met, |x| x.target_met);
+    let dcf_row = r.method == "DCF";
+    c.row(&[
+        t("B_REC_F"),
+        t(r.stage.id()),
+        format!("{:.0}", r.life),
+        format!("{:.4}", r.n),
+        format!("{:.2}", r.charged),
+        t(p.definition.id()),
+        t(p.timing.id()),
+        r.default_case.to_string(),
+        t(r.kind),
+        t(r.method),
+        num(p.share),
+        t(r.case),
+        num(p.total_capital),
+        num(p.eligible),
+        num(p.grant),
+        num(p.private_capital),
+        by(&|x| x.interest_gross_sm),
+        by(&|x| x.interest_private_sm),
+        by(&|x| x.interest_saved_sm),
+        by(&|x| x.cost_gross_sm_y),
+        by(&|x| x.cost_net_sm_y),
+        num(r.eval.abatement_t_y),
+        by(&|x| x.lac_gross),
+        by(&|x| x.lac_net),
+        num(r.eval.target),
+        met.to_string(),
+        by(&|x| x.public_outlay_s_per_t),
+        by(&|x| x.state_pv_sm),
+        if dcf_row {
+            num(r.eval.gap_s_per_t)
+        } else {
+            String::new()
+        },
+        if dcf_row {
+            num(r.eval.gap_rel)
+        } else {
+            String::new()
+        },
+        t("calculated"),
+        t(r.source),
+        t("primary"),
+        t(r.equation),
+        t(STATUS),
+    ]);
+}
+
+/// One point of the co-funding table: a stage and life, an eligible set and a
+/// timing, with the abatement that both methods divide by.
+struct SubsidyPoint<'a> {
+    m: &'a Model,
+    b: &'a Balance,
+    q: CostQuery,
+    definition: Definition,
+    timing: Timing,
+    a: f64,
+}
+
+impl SubsidyPoint<'_> {
+    fn eval(&self, share: f64) -> Result<SubsidyEval> {
+        let g = GrantQuery {
+            share,
+            definition: self.definition,
+            timing: self.timing,
+        };
+        self.m.subsidy_eval(self.b, &self.q, g, self.a)
+    }
+
+    /// The share to print for a break-even result and the evaluation at it. A
+    /// share is rounded up in its last printed digit, and moved up one digit at a
+    /// time if the strict test still fails at the rounded share.
+    fn printed_breakeven(
+        &self,
+        result: BreakEven,
+        passes: &dyn Fn(&SubsidyEval) -> bool,
+    ) -> Result<(&'static str, SubsidyEval)> {
+        let max = self.m.subsidy.share_max;
+        let (mut share, case) = match result {
+            BreakEven::MetWithoutGrant => (0.0, "met_without_grant"),
+            BreakEven::Share(s) => (round_up_share(s, SHARE_DECIMALS).min(max), "share"),
+            BreakEven::Unreachable { .. } => (max, "unreachable"),
+        };
+        let mut e = self.eval(share)?;
+        if case == "share" {
+            let step = 10f64.powi(-SHARE_DECIMALS);
+            for _ in 0..8 {
+                if passes(&e) || share >= max {
+                    break;
+                }
+                share = (share + step).min(max);
+                e = self.eval(share)?;
+            }
+        }
+        Ok((case, e))
+    }
+}
+
+/// The co-funding table of the headline run: every stage, a life of 25 and of
+/// 60 y, both eligible sets and both timings, at the share grid and at the
+/// break-even share, for the ledger (L5) and the discounted cash flow. The
+/// annual net abatement is the one the Economic ledger divides by.
+///
+/// eq: S.6a
+/// eq: S.6b
+/// eq: S.7e
+/// eq: S.8
+fn subsidy_scenarios(m: &Model) -> Result<String> {
+    let mut c = Csv::new(&SUBSIDY_HEADER);
+    let run = run_def("B_REC_F")?;
+    let b = balance_for(m, &run)?;
+    let a = m.emissions(&b.c, b.s).a_net;
+    let charged = crate::charged(m, run.case, &b);
+    let sp = &m.subsidy;
+    // The independent basis divides by the abatement against the generic
+    // reference intensity (decision D2); the row says so and points to the cost
+    // under the plant-built floor.
+    let source = if m.carbon_params.independent() {
+        format!(
+            "{SUBSIDY_SOURCE}; abatement against the generic reference intensity (central), \
+             with the cost and break-even shares under the plant-built floor in \
+             Final_Design_Basis.csv"
+        )
+    } else {
+        SUBSIDY_SOURCE.to_string()
+    };
+    for stage in Stage::ALL {
+        for life in [m.lives[0], m.lives[2]] {
+            let q = CostQuery::central(stage, life, m.n_linear, charged);
+            for definition in Definition::ALL {
+                for timing in Timing::ALL {
+                    let s = SubsidyPoint {
+                        m,
+                        b: &b,
+                        q,
+                        definition,
+                        timing,
+                        a,
+                    };
+                    let default_case =
+                        definition == sp.default_definition && timing == sp.default_timing;
+                    let row = |kind: &'static str,
+                               method: &'static str,
+                               case: &'static str,
+                               equation: &'static str,
+                               eval: &SubsidyEval,
+                               cells: Option<&MethodEval>,
+                               c: &mut Csv| {
+                        subsidy_row(
+                            c,
+                            &SubsidyRow {
+                                stage,
+                                life,
+                                n: m.n_linear,
+                                charged,
+                                default_case,
+                                kind,
+                                method,
+                                case,
+                                equation,
+                                eval,
+                                cells,
+                                source: &source,
+                            },
+                        );
+                    };
+                    for share in sp.grid {
+                        let e = s.eval(share)?;
+                        row("grid", "L5", "", "S.6a", &e, Some(&e.l5), &mut c);
+                        row("grid", "DCF", "", "S.6b", &e, Some(&e.dcf), &mut c);
+                    }
+                    let be = m.breakeven(&b, &q, definition, timing, a)?;
+                    let at_close = timing == Timing::AtClose;
+                    let (case, e) = s.printed_breakeven(be.l5.result, &|e| e.l5.target_met)?;
+                    let eq5 = if at_close { "S.7c" } else { "S.7b" };
+                    row("breakeven", "L5", case, eq5, &e, Some(&e.l5), &mut c);
+                    let (case, e) = s.printed_breakeven(be.dcf.result, &|e| e.dcf.target_met)?;
+                    let eqd = if at_close { "S.7d" } else { "S.7b" };
+                    row("breakeven", "DCF", case, eqd, &e, Some(&e.dcf), &mut c);
+                    let (case, e) = s.printed_breakeven(be.both, &|e| e.target_met)?;
+                    row("breakeven", "BOTH", case, "S.7e", &e, None, &mut c);
+                }
+            }
         }
     }
     Ok(c.out)

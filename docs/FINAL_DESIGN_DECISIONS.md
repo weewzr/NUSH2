@@ -367,8 +367,8 @@ decision = "D03"
 | Stage | Reads | Writes | Direction rule |
 |---|---|---|---|
 | Engine | `parameters.toml`, embedded with `include_str!` | model state | Native and wasm builds share one embedded file |
-| Exporter, `cargo run --release -p nush2_cli -- export --out results` | engine | seven CSVs in `results/` | Only writer of `results/` |
-| Number map, `scripts/build_numbers.py` | seven CSVs | `build/numbers.json`, git-ignored | Python never reads the TOML |
+| Exporter, `cargo run --release -p nush2_cli -- export --out results` | engine | eight CSVs in `results/` | Only writer of `results/` |
+| Number map, `scripts/build_numbers.py` | eight CSVs | `build/numbers.json`, git-ignored | Python never reads the TOML |
 | Report and deck builders | `build/numbers.json` | local `report/`, `presentation/` | Text carries tokens such as `{{A_ATM_B_MT}}` |
 | Derivations | `build/numbers.json` | `math/` worked examples | Same tokens |
 | Sensitivity sweep | `parameters.toml` low and high | `results/Sensitivity_Results.csv` | Overrides stay in memory |
@@ -427,7 +427,7 @@ One row per parameter, inputs and key results.
 | decision | text | D number |
 | status | enum | `input`, `anchored_port`, `gated_T05` and the other status words below |
 
-The `status` column of this file and of the mass balance, energy balance, emissions, economic and sensitivity files takes one of these words, set in `engine/plant/src/export.rs` and `engine/plant/src/sens.rs`. `results/Validation_Results.csv` keeps its own words, listed with that file. M4 to M8 name the engine milestone that built the model, as in `docs/VALIDATION_MATRIX.md`.
+The `status` column of this file and of the mass balance, energy balance, emissions, economic, sensitivity and co-funding files takes one of these words, set in `engine/plant/src/export.rs` and `engine/plant/src/sens.rs`. `results/Validation_Results.csv` keeps its own words, listed with that file. M4 to M8 name the engine milestone that built the model, as in `docs/VALIDATION_MATRIX.md`.
 
 | Status | Meaning |
 |---|---|
@@ -528,6 +528,31 @@ One row per run and metric.
 | class, note | text | Corner runs say they carry no probability |
 
 Sweeps beyond the low and high runs of the parameter file: `T05_BASIS` (term T05 on the flowsheet's own syngas), `MATURE_60Y`, `STEPDOWN`, `COFUNDING`, `LEVER_100`, `CRYO_H2_SPLIT`, `REFORMER_T`, `LTS_K_SOURCE`, `CONDENSATE_CO2` and `BACKUP_FIRING`.
+
+### `results/Subsidy_Scenarios.csv`
+One row per method at one grant, and one row per break-even share, for the headline run `B_REC_F` at n = 1.0 and the rated reactor. The grant is a share of the eligible first-installation capital; it changes how the owner finances the capital and leaves the abatement, the operating lines and every flow as they are. The derivation is `docs/derivation/02_cost_and_subsidy.md`.
+
+| Column | Type | Meaning |
+|---|---|---|
+| run_id, stage, life_y, n, reactor_charged_mwth | text, enum, int, number | As in the economic ledger; the lives are 25 and 60 |
+| definition | enum | `A`, the reactor alone, or `B`, the items flagged in `engine/data/parameters.toml` |
+| timing | enum | `PROGRESSIVE`, paid with the spend, or `AT_CLOSE`, paid in one sum at financial close and spent first |
+| default_case | bool | `true` on the definition and timing that the registry names as the default |
+| row_kind | enum | `grid`, a share of the registry grid, or `breakeven` |
+| method | enum | `L5`, the ledger, `DCF`, the discounted cash flow, and on a break-even row `BOTH`, which needs the target met by both |
+| share | number | Share of eligible expenditure. On a break-even row it is the infimum rounded up in the sixth decimal, so the printed share passes |
+| breakeven_case | enum | `share`, `met_without_grant` (the cost is already below the target, share 0) or `unreachable` (even the largest share leaves the cost at or above the target, which the row then prints); blank on grid rows |
+| total_capital_sgdm, eligible_capital_sgdm, grant_sgdm, private_capital_sgdm | number | First-unit capital of the incremental project, the eligible part, the grant and the rest, S$M |
+| interest_gross_sgdm, interest_private_sgdm, interest_saved_sgdm | number | Interest during construction on the gross spend, on the private balance and the part the grant saves, S$M, on the interest basis of the method |
+| annual_cost_gross_sgdm_y, annual_cost_net_sgdm_y | number | Annual incremental cost without and with the grant, S$M/y; for the DCF the levelised cost times the abatement |
+| abatement_t_y | number | Annual net abatement that both methods divide by; the same at every share |
+| cost_gross_s_per_t, cost_net_s_per_t | number | Cost per tonne without and with the grant |
+| target_s_per_t, target_met | number, bool | The target and the strict test: met only when the net cost is below it |
+| public_outlay_s_per_t, state_pv_sgdm | number | The state's outlay at year 0, S$M, and levelised over the abated tonnes, S$/t |
+| gap_to_l5_s_per_t, gap_share_of_l5 | number | On DCF rows, the DCF cost less the ledger cost at the net cost, and that gap over the ledger cost |
+| class, source, source_status, equation | text | Equation S.6a and S.6b on grid rows, S.7b to S.7e on break-even rows |
+
+A row for both methods leaves the cells that belong to one method empty. At a share of zero both costs equal the economic ledger. The inputs of the model are `SUBSIDY_` rows of the design basis.
 
 ### `results/Validation_Results.csv`
 One row per benchmark.

@@ -123,8 +123,8 @@ fn a_sweep_without_its_flowsheet_stays_visible() {
 fn eq_l_31_levers_reach_the_target() {
     let p = ParamSet::embedded().unwrap();
     let m = Model::new(&p).unwrap();
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let rows = levers(&p).unwrap();
     let mut checked = 0;
     for r in rows.iter().filter(|r| r.metric.ends_with("_NEEDED")) {
@@ -175,8 +175,8 @@ fn eq_l_31_levers_reach_the_target() {
 fn eq_l_31_mature_and_cofunding_reach_their_target() {
     let p = ParamSet::embedded().unwrap();
     let m = Model::new(&p).unwrap();
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let cost = |l5: bool, q: CostQuery| {
         if l5 {
             m.ledger(&b, &q).unwrap().l5() * 1e6 / a
@@ -225,7 +225,7 @@ fn eq_l_31_mature_and_cofunding_reach_their_target() {
 fn eq_l_31_stepdown_bars_equal_their_source_rows() {
     let p = ParamSet::embedded().unwrap();
     let m = Model::new(&p).unwrap();
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
     let mature = mature_rows(&p).unwrap();
     let pick = |run: &str, metric: &str, test: Option<f64>| -> f64 {
         let hits: Vec<_> = mature
@@ -309,7 +309,7 @@ fn eq_l_31_stepdown_bars_equal_their_source_rows() {
 #[test]
 fn dcf_family_matches_the_ledger_family() {
     let m = Model::embedded().unwrap();
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b)).unwrap();
     let fam = dcf_family(&m, &b).unwrap();
     // Four stages, three lives, three exponents, rated and need charged.
     assert_eq!(fam.len(), 4 * 3 * 3 * 2);

@@ -17,7 +17,7 @@
 //! A point that errors writes `not_converged` rows with empty results, so the
 //! sweep stays visible.
 
-use crate::anchored::{Balance, BalanceOpts, Model, Scenario};
+use crate::anchored::{Balance, BalanceOpts, CarbonSrc, Model, Scenario};
 use crate::economics::{CostQuery, Stage};
 use crate::params::ParamSet;
 use nush2_numerics::{EngineError, Result};
@@ -155,9 +155,25 @@ struct Point<'a> {
 
 #[derive(Clone, Copy, PartialEq)]
 enum Baseline {
+    /// The central reference of the basis: INL on the legacy basis, the one
+    /// `CARBON_BASELINE` names on the independent basis.
+    Central,
     Inl,
     Cho,
     Ieaghg,
+}
+
+impl Baseline {
+    /// The `CARBON_BASELINE` switch value that selects this reference on the
+    /// independent basis, `None` for the central one.
+    fn switch(self) -> Option<f64> {
+        match self {
+            Baseline::Central => None,
+            Baseline::Ieaghg => Some(0.0),
+            Baseline::Inl => Some(1.0),
+            Baseline::Cho => Some(2.0),
+        }
+    }
 }
 
 fn no_tweak(_: &Model, _: &mut BalanceOpts) {}
@@ -169,7 +185,7 @@ const CENTRAL: Point<'static> = Point {
     stage: Stage::Boak,
     n: None,
     r_at_need: false,
-    baseline: Baseline::Inl,
+    baseline: Baseline::Central,
     adj: NO_ADJUST,
     cost: NO_COST,
 };
@@ -181,7 +197,10 @@ fn adjust(m: &Model, b: &mut Balance, a: Adjust) {
     b.cap_t *= a.cap;
     b.c.burn *= a.atm;
     b.c.exported *= a.atm;
-    if a.vent_kmol_h != 0.0 {
+    b.c.cond *= a.atm;
+    // On the independent basis the condensate CO2 is a ledger line with its own
+    // vent share, so the legacy transfer from the captured stream does not apply.
+    if a.vent_kmol_h != 0.0 && b.c.src == CarbonSrc::Anchored {
         let before = b.c.cap;
         b.c = m.vent_condensate(&b.c, b.s, a.vent_kmol_h);
         if before > 0.0 {
@@ -204,19 +223,31 @@ fn solve(base: &ParamSet, pt: Point<'_>) -> Result<Solved> {
     for (id, v) in pt.params {
         p.set(id, *v)?;
     }
-    let m = Model::new(&p)?;
+    let mut m = Model::new(&p)?;
     let s = m.s_b;
     let mut o = m.opts(s);
     (pt.tweak)(&m, &mut o);
-    let mut b = m.balance(pt.scn, &o)?;
+    let mut b = m.plant_balance(pt.scn, &o)?;
     adjust(&m, &mut b, pt.adj);
+    // On the plant ledger a point that changes the baseline selects it through
+    // `CARBON_BASELINE`, so the reference gas of the cost follows the reference
+    // intensity of the carbon (rule 1 of the boundary table of N.7). Shifting
+    // the abatement alone would leave the GAS line on the central gas.
+    if b.c.src == CarbonSrc::Plant {
+        if let Some(v) = pt.baseline.switch() {
+            p.set("CARBON_BASELINE", v)?;
+            m = Model::new(&p)?;
+        }
+    }
     let h2 = m.h2_a_kgh * s * b.c.h_scale * m.hours / 1000.0;
-    let a = m.emissions(&b.c, s).a_atm
-        + match pt.baseline {
-            Baseline::Inl => 0.0,
-            Baseline::Cho => (m.base_cho - m.base_inl) * h2,
-            Baseline::Ieaghg => (m.base_ieaghg - m.base_inl) * h2,
-        };
+    // Anchored carbon only: the offset to INL, the reference of that basis, as
+    // committed at 8750b09. INL is the central one there, so its offset is zero.
+    let offset = match (b.c.src, pt.baseline) {
+        (CarbonSrc::Anchored, Baseline::Cho) => (m.base_cho - m.base_inl) * h2,
+        (CarbonSrc::Anchored, Baseline::Ieaghg) => (m.base_ieaghg - m.base_inl) * h2,
+        _ => 0.0,
+    };
+    let a = m.emissions(&b.c, s).a_net + offset;
     let r = if pt.r_at_need { b.r } else { m.r_rated };
     let n = pt.n.unwrap_or(m.n_linear);
     Ok(Solved { m, b, a, r, n })
@@ -442,8 +473,8 @@ enum Method {
 /// eq: L.31
 pub fn levers(base: &ParamSet) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let target = m.target_c;
     let cost = |method: Method, q: CostQuery| -> Result<f64> {
         Ok(match method {
@@ -552,7 +583,7 @@ pub fn levers(base: &ParamSet) -> Result<Vec<SensRow>> {
 /// Life sweep at BOAK, n = 1.0, the rated reactor charged: both methods and
 /// both LCOH at each life the ledger carries, against the 25 y values.
 fn life_rows(m: &Model, b: &Balance) -> Result<Vec<SensRow>> {
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let a = m.emissions(&b.c, b.s).a_net;
     let at = |life: f64| -> Result<[f64; 5]> {
         let q = CostQuery::central(Stage::Boak, life, m.n_linear, m.r_rated);
         let l = m.ledger(b, &q)?;
@@ -603,7 +634,7 @@ fn life_rows(m: &Model, b: &Balance) -> Result<Vec<SensRow>> {
 /// unabated SMR making the same extra H2.
 fn backup_rows(m: &Model, b: &Balance) -> Vec<SensRow> {
     let s = b.s;
-    let a0 = m.emissions(&b.c, s).a_atm;
+    let a0 = m.emissions(&b.c, s).a_net;
     let conv = m.backup(s);
     let heat = m.backup_heater(b, s);
     let routes: [(f64, &str, [f64; 3]); 4] = [
@@ -667,7 +698,7 @@ fn backup_rows(m: &Model, b: &Balance) -> Vec<SensRow> {
 pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
     let central = evaluate(base, CENTRAL)?;
-    let b0 = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let b0 = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
     let mut w = Sweep {
         rows: Vec::new(),
         base,
@@ -713,6 +744,73 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
         m.ts.central,
         &[m.ts.low, m.ts.central, m.ts.high],
     );
+    if m.carbon_params.independent() {
+        // The independent basis puts the cryogenic design inputs, the condensate
+        // vent, the central reference and the shipping distance in the table, so
+        // the abatement and the cost can be read against each (decision D8).
+        let band = |id: &str| {
+            base.entries()
+                .find(|e| e.id == id)
+                .and_then(|e| e.low.zip(e.high))
+        };
+        let cp = &m.carbon_params;
+        if let Some((lo, hi)) = band("CRYO_C_RECOVERY") {
+            w.values(
+                "CRYO_RECOVERY",
+                "CRYO_C_RECOVERY",
+                "Cryogenic carbon recovery",
+                "-",
+                cp.cryo_f,
+                &[lo, cp.cryo_f, hi],
+            );
+        }
+        if let Some((lo, hi)) = band("CRYO_H2_RETURN") {
+            w.values(
+                "CRYO_H2_RETURN",
+                "CRYO_H2_RETURN",
+                "Cryogenic hydrogen return",
+                "-",
+                cp.cryo_r,
+                &[lo, cp.cryo_r, hi],
+            );
+        }
+        w.values(
+            "COND_CO2_VENT",
+            "COND_CO2_VENT",
+            "Share of the condensate CO2 vented",
+            "-",
+            cp.cond_vent,
+            &[0.0, 1.0],
+        );
+        w.values(
+            "CARBON_BASELINE",
+            "CARBON_BASELINE",
+            "Central reference: 0 IEAGHG, 1 INL, 2 Cho",
+            "index",
+            0.0,
+            &[0.0, 1.0, 2.0],
+        );
+        if let Some((lo, hi)) = band("TS_SHIP_DIST_KM") {
+            w.values(
+                "TS_DISTANCE",
+                "TS_SHIP_DIST_KM",
+                "Shipping distance",
+                "km",
+                cp.ts.dist_km,
+                &[lo, cp.ts.dist_km, hi],
+            );
+        }
+        if let Some((lo, hi)) = band("TS_COND_KWH_T") {
+            w.values(
+                "TS_CONDITIONING",
+                "TS_COND_KWH_T",
+                "Conditioning electricity",
+                "kWh/t",
+                cp.ts.cond_kwh_t,
+                &[lo, cp.ts.cond_kwh_t, hi],
+            );
+        }
+    }
     w.values(
         "ETA_POWER",
         "ETA_POWER",
@@ -854,6 +952,14 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
             ..CENTRAL
         },
     );
+    // The central reference intensity of the basis, the value the group's test
+    // values are measured from: the one `CARBON_BASELINE` names on the
+    // independent basis, INL's on the legacy one.
+    let central_kg = if m.carbon_params.independent() {
+        m.baseline_kg_kg(m.carbon_params.baseline)
+    } else {
+        m.base_inl
+    };
     for (id, value, baseline) in [
         ("BASE_INL", m.base_inl, Baseline::Inl),
         ("BASE_CHO", m.base_cho, Baseline::Cho),
@@ -865,7 +971,7 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
         };
         let run = format!("B_REC_F_{id}");
         w.push(
-            lab("BASELINE", &run, "Baseline", "kg/kg", m.base_inl, value),
+            lab("BASELINE", &run, "Baseline", "kg/kg", central_kg, value),
             pt,
         );
     }
@@ -1015,7 +1121,14 @@ pub fn sweeps(base: &ParamSet, fs: &FsInputs) -> Result<Vec<SensRow>> {
     }
 
     // Gas saving on Ahn's 18.8% in place of the INL pair.
-    let saving = |ng: f64| 1.0 - ng / (m.ng_conv * b0.c.h_scale);
+    // The unabated reference is the one the cost ledger prices: the gas that the
+    // central intensity implies on the independent basis, INL's on the legacy one.
+    let ng_ref = if b0.c.src == CarbonSrc::Plant {
+        m.reference_gas_mmscfd(&b0.c, b0.s)? / b0.s
+    } else {
+        m.ng_conv * b0.c.h_scale
+    };
+    let saving = |ng: f64| 1.0 - ng / ng_ref;
     let s_inl = saving(b0.c.ng);
     let s_ahn = saving(m.ng_ahn_equivalent);
     w.push(
@@ -1293,8 +1406,8 @@ struct CostRun {
 impl CostRun {
     fn new(base: &ParamSet) -> Result<Self> {
         let m = Model::new(base)?;
-        let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-        let a = m.emissions(&b.c, m.s_b).a_atm;
+        let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+        let a = m.emissions(&b.c, m.s_b).a_net;
         Ok(Self { m, b, a })
     }
 
@@ -1499,8 +1612,8 @@ pub fn stepdown_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
 /// eq: L.31
 pub fn cofunding_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
     let m = Model::new(base)?;
-    let b = m.balance(Scenario::RecF, &m.opts(m.s_b))?;
-    let a = m.emissions(&b.c, m.s_b).a_atm;
+    let b = m.plant_balance(Scenario::RecF, &m.opts(m.s_b))?;
+    let a = m.emissions(&b.c, m.s_b).a_net;
     let target = m.target_mature_c;
     let cost = |method: Method, q: CostQuery| -> Result<f64> {
         Ok(match method {
@@ -1563,4 +1676,142 @@ pub fn cofunding_rows(base: &ParamSet) -> Result<Vec<SensRow>> {
         }
     }
     Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::abatement::BaselineKind;
+
+    fn rel(a: f64, b: f64) -> f64 {
+        (a - b).abs() / b.abs().max(1e-300)
+    }
+
+    /// Rule 1 of the boundary table of N.7 at every sensitivity point that
+    /// changes the baseline: the points of the BASELINE group and of the
+    /// CARBON_BASELINE group. The model of the point carries the baseline it
+    /// names, the GAS line of its cost reads the reference gas that baseline
+    /// implies (the gas of the decomposition of N.9.2), and the abatement it
+    /// divides by is the net abatement against that baseline.
+    #[test]
+    fn rule_1_of_n_7_holds_at_every_sensitivity_point_that_changes_the_baseline() {
+        let base = ParamSet::embedded().unwrap();
+        let by_group: [(&str, Point<'_>, BaselineKind); 6] = [
+            (
+                "BASELINE IEAGHG",
+                Point {
+                    baseline: Baseline::Ieaghg,
+                    ..CENTRAL
+                },
+                BaselineKind::Ieaghg,
+            ),
+            (
+                "BASELINE INL",
+                Point {
+                    baseline: Baseline::Inl,
+                    ..CENTRAL
+                },
+                BaselineKind::Inl,
+            ),
+            (
+                "BASELINE Cho",
+                Point {
+                    baseline: Baseline::Cho,
+                    ..CENTRAL
+                },
+                BaselineKind::Cho,
+            ),
+            (
+                "CARBON_BASELINE 0",
+                Point {
+                    params: &[("CARBON_BASELINE", 0.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Ieaghg,
+            ),
+            (
+                "CARBON_BASELINE 1",
+                Point {
+                    params: &[("CARBON_BASELINE", 1.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Inl,
+            ),
+            (
+                "CARBON_BASELINE 2",
+                Point {
+                    params: &[("CARBON_BASELINE", 2.0)],
+                    ..CENTRAL
+                },
+                BaselineKind::Cho,
+            ),
+        ];
+        let mut gas = Vec::new();
+        for (name, pt, kind) in by_group {
+            let sv = solve(&base, pt).unwrap();
+            let s = sv.m.s_b;
+            assert_eq!(sv.m.carbon_params.baseline, kind, "{name}");
+            let q = query(&pt, sv.m.lives[0], sv.n, sv.r);
+            let k = sv.m.cost_items(&sv.b, &q).unwrap();
+            let ab = sv.m.abatement(&sv.b, s).unwrap();
+            let d = ab.decomposition.unwrap();
+            // The GAS line prices the gas of the decomposition, the gas that
+            // this baseline implies.
+            assert!(rel(k.ng_smr, d.n_ref_mmscfd) < 1e-12, "{name}");
+            let led = sv.m.ledger(&sv.b, &q).unwrap();
+            let diff = -led.gas / k.gas_s_m_per_mmscfd;
+            assert!(rel(diff, d.n_ref_mmscfd - k.ng_plant) < 1e-12, "{name}");
+            // The abatement of the point is the net abatement against it, with
+            // no offset on the abatement alone.
+            let row = ab.rows.iter().find(|r| r.id == kind.id()).unwrap();
+            assert!(
+                rel(sv.a, row.a_net) < 1e-12,
+                "{name}: {} {}",
+                sv.a,
+                row.a_net
+            );
+            // The decomposition adds up to the direct abatement against it.
+            assert!(rel(d.total, row.a_direct) < 1e-9, "{name}");
+            gas.push((kind, k.ng_smr));
+        }
+        // A higher baseline implies more reference gas, so a point that moved
+        // the abatement alone would have left these three equal.
+        let of = |kind: BaselineKind| gas.iter().find(|g| g.0 == kind).unwrap().1;
+        assert!(of(BaselineKind::Ieaghg) < of(BaselineKind::Inl));
+        assert!(of(BaselineKind::Inl) < of(BaselineKind::Cho));
+        // The two groups agree to the last digit, point by point.
+        for i in 0..3 {
+            assert_eq!(gas[i].0, gas[i + 3].0);
+            assert_eq!(gas[i].1.to_bits(), gas[i + 3].1.to_bits(), "{i}");
+        }
+    }
+
+    /// On the legacy basis a baseline point keeps the offset of the abatement
+    /// that was committed at 8750b09: INL is the central reference there and
+    /// has none.
+    #[test]
+    fn legacy_baseline_points_keep_the_committed_offsets() {
+        let mut base = ParamSet::embedded().unwrap();
+        base.set("CARBON_BASIS", 0.0).unwrap();
+        let central = solve(&base, CENTRAL).unwrap();
+        let inl = solve(
+            &base,
+            Point {
+                baseline: Baseline::Inl,
+                ..CENTRAL
+            },
+        )
+        .unwrap();
+        assert_eq!(central.a.to_bits(), inl.a.to_bits());
+        let cho = solve(
+            &base,
+            Point {
+                baseline: Baseline::Cho,
+                ..CENTRAL
+            },
+        )
+        .unwrap();
+        let h2 = cho.m.h2_a_kgh * cho.m.s_b * cho.b.c.h_scale * cho.m.hours / 1000.0;
+        assert!(rel(cho.a - central.a, (cho.m.base_cho - cho.m.base_inl) * h2) < 1e-12);
+    }
 }

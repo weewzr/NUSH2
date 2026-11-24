@@ -471,7 +471,12 @@ fn default_solve_matches_the_published_results() {
     let line = |view: &str| {
         csv_value(
             em,
-            &[(0, "B_REC_F"), (1, "INL_9p21"), (2, view), (3, "ABATEMENT")],
+            &[
+                (0, "B_REC_F"),
+                (1, "IEAGHG_9p00"),
+                (2, view),
+                (3, "ABATEMENT"),
+            ],
             5,
         )
     };
@@ -1057,7 +1062,7 @@ fn every_pfd_unit_has_status_and_sections() {
 /// Final_Design_Basis.csv equals that cell. The KPIs without one are listed.
 #[test]
 fn case_a_kpis_match_the_case_a_mea_cells() {
-    const MAP: [(&str, &str); 21] = [
+    const MAP: [(&str, &str); 26] = [
         ("rating_mwth", "REACTOR_RATED_MWTH"),
         ("reactor_required_mwth", "RES_REACTOR_NEEDED_MWTH"),
         ("surplus_mwth", "RES_MARGIN_210_MWTH"),
@@ -1079,10 +1084,16 @@ fn case_a_kpis_match_the_case_a_mea_cells() {
         ("solvent_t_h", "RES_SOLVENT_T_H"),
         ("target_abatement_t_y", "TARGET_ABATEMENT"),
         ("target_cost_s_per_t", "TARGET_COST"),
+        ("co2_ts_t_y", "RES_TS_EMISSION_T_Y"),
+        ("abatement_direct_t_y", "RES_ABATEMENT_DIRECT_T_Y"),
+        ("abatement_kg_per_kg", "RES_ABATEMENT_PER_KG"),
+        ("reduction", "RES_REDUCTION"),
+        ("intensity_kg_kg", "RES_INTENSITY_KG_KG"),
     ];
     // KPIs with no case_a_mea cell: their rows in the results are Case B only,
     // or they live in another file.
-    const NO_CELL: [&str; 11] = [
+    const NO_CELL: [&str; 12] = [
+        "carbon_residual_rel",
         "surplus_ahn_mwth",
         "unmet_heat_mwth",
         "h2_rich_kmol_h",
@@ -1174,12 +1185,19 @@ fn rating_100_is_infeasible_and_no_case_is_met() {
     }
 }
 
-/// With stage 10OAK_P46 and gas at S$25/GJ the selected case sits below the
-/// target; the case list carries it with the same verdict as the strip, and
-/// every verdict follows feasibility and both methods.
+/// With stage 10OAK_P46, gas at S$25/GJ and transport and storage at S$40/t the
+/// selected case sits below the target; the case list carries it with the same
+/// verdict as the strip, and every verdict follows feasibility and both methods.
+/// The reference gas of the cost ledger is the gas that the central intensity
+/// implies (rule 1 of N.7), which saves less gas than INL's conventional plant
+/// did, so the earlier fixture of gas alone no longer reaches the target: it read
+/// 102.9 and 103.2 S$/t on the independent basis.
 #[test]
 fn ten_oak_at_25_gas_reads_one_verdict() {
-    let r = solve_with(json!({"stage": "10OAK_P46", "gas_s_gj": 25}), true);
+    let r = solve_with(
+        json!({"stage": "10OAK_P46", "gas_s_gj": 25, "ts_s_t": 40}),
+        true,
+    );
     assert_eq!(r["status"], "ok", "{}", r["messages"]);
     let cost = &r["targets"]["cost"];
     let t = cost["target"].as_f64().unwrap();
@@ -1240,6 +1258,12 @@ fn no_control_moves_the_h2_return_closure() {
         else {
             continue;
         };
+        // The two cryogenic design inputs are inputs of the closure run itself on
+        // the independent basis, where the live flowsheet runs the input and not
+        // the closure value.
+        if id == "CRYO_C_RECOVERY" || id == "CRYO_H2_RETURN" {
+            continue;
+        }
         for end in ["model_min", "model_max"] {
             sets.push(vec![(id.to_string(), rec[end].as_f64().unwrap() * scale)]);
         }
@@ -1296,5 +1320,24 @@ fn island_duties_follow_the_design_point() {
         }
         assert!(r["profiles"]["absorber"].is_null());
         assert!(r["profiles"]["stripper"].is_null());
+    }
+}
+
+/// The headline abatement and cost indicators carry the wording that ties them
+/// to a generic reference intensity (decision D2), and keep their ids.
+#[test]
+fn headline_indicator_labels_name_the_generic_reference_intensity() {
+    for id in [
+        "abatement_t_y",
+        "abatement_direct_t_y",
+        "cost_s_per_t",
+        "cost_l3_s_per_t",
+        "cost_lac_dcf_s_per_t",
+    ] {
+        let (_, label, _) = KPIS.iter().find(|k| k.0 == id).expect(id);
+        assert!(
+            label.contains("generic reference intensity"),
+            "{id}: {label}"
+        );
     }
 }

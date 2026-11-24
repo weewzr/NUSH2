@@ -260,9 +260,13 @@ fn h2_return_closes_the_inl_pair() {
     assert!(s.closure.h2_return > 0.0 && s.closure.h2_return < 1.0);
     assert!((r.ng_mmscfd - m.ng_c6).abs() < 1e-12);
     assert!((r.h2_product_kg_h / m.h2_a_kgh - 1.0).abs() < 1e-9);
-    // The same fraction is carried to every other run.
+    // The same fraction is carried to every other run: the registry design input
+    // on the independent basis, the closure value on the legacy basis. The input
+    // reproduces the closure to twelve digits.
+    let want = flowsheet::suite_h2_return(m, &s.closure);
+    assert!((m.carbon_params.cryo_r - s.closure.h2_return).abs() < 1e-9);
     for x in &s.runs {
-        assert_eq!(x.spec.h2_return, s.closure.h2_return);
+        assert_eq!(x.spec.h2_return, want);
     }
 }
 
@@ -345,7 +349,8 @@ fn full_tier_carries_the_flowsheet() {
 fn fresh_b_rec_f(t_c: f64) -> (u64, u64, u64) {
     std::thread::spawn(move || {
         let m = Model::embedded().unwrap();
-        let r = flowsheet::close_h2_return(&m).unwrap().h2_return;
+        let closure = flowsheet::close_h2_return(&m).unwrap();
+        let r = flowsheet::suite_h2_return(&m, &closure);
         let mut spec = FlowsheetSpec::new(
             &m,
             Case::B,

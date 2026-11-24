@@ -105,7 +105,7 @@ cargo run --release -p nush2_cli -- drift
 python scripts/build_numbers.py
 ```
 
-The first command runs the code tests in the dev profile. The export writes the seven results files to `target/results`, and `compare_results.py` checks them against the committed `results/`. `drift` prints the Anchored, Headline and Modelled presets side by side. `build_numbers.py` builds `build/numbers.json` from `results/`.
+The first command runs the code tests in the dev profile. The export writes the eight results files to `target/results`, and `compare_results.py` checks them against the committed `results/`. `drift` prints the Anchored, Headline and Modelled presets side by side. `build_numbers.py` builds `build/numbers.json` from `results/`.
 
 `nush2 export --out results` rewrites the committed results. The release profile uses fat link-time optimisation, so release builds are slow.
 
@@ -208,7 +208,7 @@ The consequences are carried into the results. The column gate failed, so the sp
 |---|---|
 | `engine/` | Rust workspace of the engine, one crate per layer (table below) |
 | `engine/data/parameters.toml` | Every input number, each with its class, rigour, source, locator and decision |
-| `results/` | The seven CSV files that `nush2 export` writes: design basis, mass and energy balances, emissions and economic ledgers, sensitivities and validation |
+| `results/` | The eight CSV files that `nush2 export` writes: design basis, mass and energy balances, emissions and economic ledgers, sensitivities, government co-funding scenarios and validation |
 | `frontend/` | The browser simulator: static HTML, CSS and JavaScript around the WebAssembly engine |
 | `math/` | First-principles derivations: LaTeX source, equation register and the built PDF |
 | `scripts/` | Python build and check scripts, standard library only |

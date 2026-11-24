@@ -3,6 +3,7 @@
 //! utility balance, the term gates and the exporter. No file access here: the
 //! CLI owns the disk, and this crate returns strings.
 
+pub mod abatement;
 pub mod anchored;
 pub mod carbon;
 pub mod comparator;
@@ -15,7 +16,9 @@ pub mod flowsheet;
 pub mod gates;
 pub mod heatrec;
 pub mod params;
+pub mod refplant;
 pub mod sens;
+pub mod subsidy;
 pub mod terms;
 pub mod utility;
 
@@ -174,7 +177,7 @@ pub fn cost_point(
     n: f64,
     r: f64,
 ) -> Result<CostPoint> {
-    let a = m.emissions(&b.c, b.s).a_atm;
+    let a = m.emissions(&b.c, b.s).a_net;
     let q = CostQuery::central(stage, life, n, r);
     let ledger = m.ledger(b, &q)?;
     let ladder = ledger.ladder();
@@ -238,7 +241,7 @@ pub fn run(inputs: &Inputs) -> Result<PlantSolution> {
     let p = inputs.params()?;
     let m = Model::new(&p)?;
     let s = m.scale(inputs.case);
-    let b = m.balance(inputs.scenario, &m.opts(s))?;
+    let b = m.plant_balance(inputs.scenario, &m.opts(s))?;
     let r_charged = charged(&m, inputs.case, &b);
     let mut points = Vec::new();
     for stage in [Stage::Boak, Stage::Foak] {
@@ -294,7 +297,7 @@ pub fn run(inputs: &Inputs) -> Result<PlantSolution> {
     }
     Ok(PlantSolution {
         flowsheet: sheet,
-        ng_mmscfd: m.ng_mmscfd(s),
+        ng_mmscfd: m.ng_mmscfd_of(&b.c, s),
         terms: term_list,
         carbon: b.c,
         heat: HeatBalance {
