@@ -6,7 +6,7 @@ No tolerance is weakened. No golden file is updated merely to pass. A failed lit
 
 | Gate | Check |
 |---|---|
-| G0 | Frozen snapshot `engine/vv/data/pre_reference_results/` exists (`84dca45`). |
+| G0 | Frozen snapshot `engine/vv/data/pre_reference_results/` exists (commit `212caf1`, recorded as `84dca45` before the local rewrite of 2026-11-10). |
 | G1 | Zero subsidy: `eq_s_9b_*`, `eq_s_8_*`, and `subsidy_zero_share_equals_economic_ledger` in `build_numbers.py`, for every definition including C. |
 | G2 | Legacy basis: `cargo run --release -p nush2_cli -- export --out <dir> --basis legacy`, then `python scripts/compare_results.py engine/vv/data/legacy_results <dir> --subset` with only the documented allowed cells. Bit-identical. |
 | G3 | `REF_BASIS = 0` (or `--ref-basis historical`) reproduces the pre-change snapshot except documented new rows and columns. |

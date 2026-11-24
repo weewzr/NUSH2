@@ -18,7 +18,7 @@ Merging into `main` other than by the coordinating session through the release g
 
 ## 4. Scientific decisions
 
-IEAGHG reference direction and definition C are settled: implement them. For a new unresolved physical datum or consequential assumption: research authoritative evidence, record source and uncertainty, keep unsupported assumptions labelled, never invent evidence, and do not halt unrelated work. Do not alter the owner's accepted definitions without a documented technical reason. Defaults D21 to D23 stay as labelled defaults.
+IEAGHG reference direction and definition C are settled: implement them. For a new unresolved physical datum or consequential assumption: research authoritative evidence, record source and uncertainty, keep unsupported assumptions labelled, never invent evidence, and do not halt unrelated work. Do not alter the owner's accepted definitions without a documented technical reason. D21 to D23 were confirmed by the owner on 2026-11-24 as labelled assumptions, each with its sensitivity row (`ORIGINAL_BRIEF_3_MERGE_POLICY.md`); they stay labelled as assumptions.
 
 ## 5. Agent roles (one coordinating agent, serial writers)
 
