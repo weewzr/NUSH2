@@ -59,7 +59,7 @@ Write `docs/FINAL_VERIFICATION_REPORT.md`. Each item has: requirement, test or e
 14. Browser tests at four viewports, reduced motion, keyboard, no console errors, no external requests.
 15. Derivation 03, the PDF build, the equation-to-Rust table with verified line numbers.
 16. README and documents generated from results; text guards; withdrawn figures; no privacy-flagged material in Git.
-17. Independent verification run, fork-error investigation, the pull request open and unmerged.
+17. Independent verification run, fork-error investigation, the release-gate record (`COMMIT_AND_DEPLOYMENT.md` section 5), the fast-forward of `main` and the check of the published site.
 
 Also list unresolved assumptions (D14, D15, D16, D21 to D23) and limitations in the report's opening paragraph.
 

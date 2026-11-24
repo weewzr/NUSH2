@@ -4,7 +4,7 @@ The repository owner wants the session to manage routine development without ask
 
 ## 1. Pre-authorised, inside this repository and its development environment
 
-Inspect all files, Git history and branches; create and edit project files; install ordinary project dependencies (project-local, never global); perform clean Rust rebuilds; run Python scripts; run verification and tests; build PDFs, figures and the WebAssembly module; run the browser self-test; create dedicated development branches; commit completed phases; push completed phase commits to the authorised completion branch; open pull requests; use independent subagents and integrate their output; continue through phases automatically.
+Inspect all files, Git history and branches; create and edit project files; install ordinary project dependencies (project-local, never global); perform clean Rust rebuilds; run Python scripts; run verification and tests; build PDFs, figures and the WebAssembly module; run the browser self-test; create dedicated development branches; commit completed phases; push completed phase commits to the authorised completion branch; open pull requests; use independent subagents and integrate their output; continue through phases automatically. When the release gate in `COMMIT_AND_DEPLOYMENT.md` section 5 passes, the coordinating session (and no other agent) merges `main` into the completion branch with an ordinary merge commit, re-runs the gates and fast-forward pushes the completion branch to `main`, never with `--force` or `--force-with-lease`.
 
 These instructions express the owner's authorisation. They cannot grant GitHub credentials, override a protected branch, or change the permissions of the collaborator's account. Before leaving, the collaborator must set the real repository access, authentication and Claude Code permission rules (settings files or a permission mode that allows the commands above). Do not bypass approval controls, the sandbox, authentication or any security restriction. If an action needs an unavailable permission, record a BLOCKER in `PROGRESS.md` and continue with other work.
 
@@ -14,7 +14,7 @@ Routine edits, dependency installs, tests, builds, document generation, normal c
 
 ## 3. Not pre-authorised (never do these)
 
-Merging into `main` or any protected branch; force-push; history rewrite; deleting branches or remote refs; deleting files outside the repository and its temp folders; touching other repositories; creating a new repository; reading, uploading or publishing the privacy-flagged local files (947 files) and the 140 local Office and PDF files without the owner's explicit permission for that exact action; changing authentication, credentials or settings; sending messages or posting outside GitHub pull requests of this repository.
+Merging into `main` other than by the coordinating session through the release gate; merging into any other branch except the completion branch; force-push; history rewrite; deleting branches or remote refs; deleting files outside the repository and its temp folders; touching other repositories; creating a new repository; reading, uploading or publishing the privacy-flagged local files (947 files) and the 140 local Office and PDF files without the owner's explicit permission for that exact action; changing authentication, credentials or settings; sending messages or posting outside GitHub pull requests of this repository.
 
 ## 4. Scientific decisions
 

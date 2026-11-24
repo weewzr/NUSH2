@@ -21,7 +21,7 @@ This folder is the persistent instruction set for a future Claude Code session t
 - Never invent a value, a citation or a coordinate. Mark gaps as unavailable and continue with other work.
 - Never weaken a tolerance or edit a golden file to make a test pass.
 - Existing work is valuable. Never reset, force-push or delete history.
-- Do not merge into `main`. The final pull request stays open.
+- Merge into `main` only through the release gate in `COMMIT_AND_DEPLOYMENT.md` section 5. Only the coordinating session merges, by merging `main` into the completion branch and fast-forward pushing it to `main`. Never the GitHub merge button, never force-push, never rewrite or delete history.
 
 ## What this package does not contain
 
@@ -34,3 +34,5 @@ No engineering change. The implementation is the job of the future session.
 ## Source briefs
 
 `ORIGINAL_BRIEF_1_COMPLETION_SPECIFICATION.md` and `ORIGINAL_BRIEF_2_RAYSTORAGE_UPDATE.md` hold the owner's two instructions this package answers. Check the package against them.
+
+`ORIGINAL_BRIEF_3_MERGE_POLICY.md` records the owner's instruction of 2026-11-24: the release gate, the merge method and the confirmations of D21 to D23. Brief 3 supersedes the merge and deployment rules of briefs 1 and 2; every other rule of those briefs stands. Briefs 1 and 2 stay unedited as historical records.
