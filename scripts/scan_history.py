@@ -17,8 +17,9 @@ What it reads, for every commit reachable from REV (default HEAD):
 The path, profile, matriculation, cohort, schedule, allocation and declaration
 rules are imported from scripts/check_clean.py, so the two scans share one
 definition and this file holds no literal pattern that could trip either scan.
-Two rules are added here. E-mail addresses are hits unless they end with one of
-the non-personal service addresses that scripts/check_site.py accepts (OK_MAIL).
+Two rules are added here. E-mail addresses are hits unless they are the
+owner's GitHub noreply address (OWNER_MAIL) or one of the service addresses in
+SERVICE_MAIL; another account's users.noreply.github.com address is a hit.
 Module-style course codes (two or three capitals, four digits, an optional
 capital) are hits unless they are one of the reviewed technical identifiers in
 TECHNICAL_IDS, each of which names a reactor design, a price basis, a cited
@@ -42,7 +43,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import check_clean  # noqa: E402  (shared rule definitions)
-from check_site import OK_MAIL  # noqa: E402
+
+# Allowed e-mail addresses. Only the repository owner's GitHub noreply address
+# (with or without the numeric account id) and the service addresses that the
+# recorded history needs. Any other users.noreply.github.com address names a
+# different GitHub account and is a hit.
+OWNER_MAIL = re.compile(r"(?:\d+\+)?weewzr@users\.noreply\.github\.com")
+SERVICE_MAIL = frozenset({"noreply@github.com", "noreply@anthropic.com"})
 
 TEXT_RULES = ("path", "profile", "drive", "matric", "cohort", "schedule", "allocation", "declaration")
 BINARY_RULES = ("path", "profile")
@@ -61,7 +68,8 @@ TECHNICAL_IDS = {
 
 def allowed(label, text):
     if label == "email":
-        return text.lower().endswith(OK_MAIL)
+        low = text.lower()
+        return low in SERVICE_MAIL or OWNER_MAIL.fullmatch(low) is not None
     if label == "course":
         return text in TECHNICAL_IDS
     return False
@@ -147,6 +155,11 @@ def self_test():
         "email": j(["someone", "@", "mail.test"]),
         "course": j(["XY", "1234"]),
     }
+    # Further samples that must fire: another account's noreply address.
+    planted_more = [
+        ("email", j(["999+someone", "@", "users.noreply.github.com"])),
+        ("email", j(["weewzr.fake", "@", "users.noreply.github.com"])),
+    ]
     quiet = {
         "email": j(["123+weewzr", "@", "users.noreply.github.com"]),
         "course": "AP1000",
@@ -155,6 +168,10 @@ def self_test():
     for label, sample in planted.items():
         got = [lab for lab, _ in text_hits(sample, rx, [label])]
         print(f"{'ok  ' if got else 'FAIL'} {label} fires on a planted sample")
+        bad += 0 if got else 1
+    for label, sample in planted_more:
+        got = [lab for lab, _ in text_hits(sample, rx, [label])]
+        print(f"{'ok  ' if got else 'FAIL'} {label} fires on another account's noreply address")
         bad += 0 if got else 1
     for label, sample in quiet.items():
         got = [lab for lab, _ in text_hits(sample, rx, [label])]
