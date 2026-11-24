@@ -16,14 +16,14 @@ Kept as written. Section "Milestone 1" below corrects it; `CURRENT_STATE_AND_BAS
 
 ## Current phase
 
-Milestone 1 (repository audit and baseline lock) recorded below. Next: milestone 2, starting with WP0 of `ENGINE_REFERENCE_PLANT.md`.
+Milestone 1 (repository audit and baseline lock) is recorded below and stays partial until F1 to F4 are closed. Milestone 2 (WP0 and WP1 of `ENGINE_REFERENCE_PLANT.md`) is implemented and recorded below. Next: milestone 3 (WP3 and WP4 up to regeneration).
 
 ## Milestones
 
 | # | Milestone | Status | Commit | Pushed head |
 |---|---|---|---|---|
 | 1 | Repository audit and baseline lock | **partial**: recorded and pushed, but the milestone's gates are not met; the inherited baseline fails G5, the G0 snapshot regression, the G4 mass-balance byte comparison, `build_numbers.py` (and its `--self-test` and G1 zero-share check), the two SymPy scripts and one browser check (open findings F1 to F4 below); CI on Linux (pull request 4) fails the same default-basis comparison, so F1 is not a Windows-only effect. Stays partial until F1 to F4 are closed by their milestones | `9fc36ff`, `b37a76d`, `241e39e`, `486de50` (results), `78835a7` and `5d5a0b4` (verifier review), and the CI-record commit that follows `5d5a0b4` | see "Milestone 1" |
-| 2 | Reference-plant equations and implementation | not started | | |
+| 2 | Reference-plant equations and implementation | **done** for its scope (WP0, WP1): registry block, `refplant.rs`, 17 tests, derivation 03 for N.R.1 to N.R.12 and N.R.15, 10 of 10 mutations caught; on this machine every table is byte-identical to the base commit except the 130 new registry rows and the registry count. The repository gates stay red only by the inherited F1 to F4 and, by design until the regeneration of milestones 3 and 5, by the new rows in the default-basis comparison (critique C03) | `1170c74` (implementation), and the records commit that follows it | see "Milestone 2" |
 | 3 | Reference integration and ninth export | not started | | |
 | 4 | Carbon and subsidy completion | not started | | |
 | 5 | Economic reconciliation and regeneration | not started | | |
@@ -170,6 +170,61 @@ Reading: every failure is F1; no other defect of this branch appeared, so nothin
 
 The raystorage archive cleanup that `RAYSTORAGE_INTEGRATION.md` lists as a pending owner action (remove the browser-profile folders) is done: raystorage `main` moved from `3a25c4a` to `aeba052` on 2026-11-24. The package's pin stays `3a25c4a`, which is still in that history; the removed text extracts are read from history only and never copied here.
 
+## Milestone 2: reference-plant equations and implementation (2026-11-24)
+
+Scope: WP0 and WP1 of `ENGINE_REFERENCE_PLANT.md` (`COMMIT_AND_DEPLOYMENT.md` section 3). The specification's WP0 list also names the definition C enum, the default-definition code and `SystemBasis` in `economics.rs`; adding definition C now would add rows to `Subsidy_Scenarios.csv`, and the flip of the default belongs to WP4, so those parts stay with milestones 3 to 5. Only the two subsidy registry entries are added and read.
+
+### Source of every value
+
+The damaged passages of `reference/` (214 `<working folder>` substitutions) were not used as a source. Every value was read again from the IEAGHG 2017-02 report itself: the official PDF linked from the IEAGHG publication page (286 pages, SHA-256 `33a3dd61486a7fe748a06be7a61903470f356332e0e8a7be7fde66979b555e44`), downloaded outside the repository and not committed. Pages read: p6, p7, p8, p12 (Table 1), p16 (Table 2), p18 (Table 4), p34 (block flow diagram), p37 (Sheet 14), p38, p44 and p45 (Heat and Material Balance, rendered and read from the text layer), p48 (utility sheet, rendered), p54 (equipment list sheet 5 of 8), p58, p222 (Sheet 85), p229 (Sheet 92), p255 and p256 (Reference Document Tables 1 and 2). The 103 stream entries were generated once by a throw-away script from the text layer of p44 and p45, with checks that streams 2 and 3 print the composition of stream 1, that 10, 11, 14 and 15 print pure water and that 12 and 13 print 0.9999+ hydrogen. The raystorage archive was not needed. No value that WP0 or WP1 needs was missing.
+
+### Changes (commit `1170c74`)
+
+- `engine/data/parameters.toml`: 130 new entries, no existing row edited (critique C01). 103 stream entries `REF_S{nn}_{T_C,P_MPA,KMOL_H,KG_H}` and `REF_S{nn}_Y_{species}` (the 43 nonzero printed fractions of streams 1, 4, 5, 6, 7, 8 and 9); 23 scalars `REF_*` with PDF page and table (the spec's list plus `REF_NG_LHV_ANNEX_MJ_KG` 46.502, p255, for the specification-against-Table-2 LHV check); `REF_BASIS` shipped as 0 (critique C03); `SMR_ISLAND_POWER_ISLAND_TPC_EURM` 20.124 (p222); `SMR_ISLAND_NUSH2_EXCLUDES_POWER_ISLAND` 0, capital only, its text naming the island's O&M share (D23, C14); `SUBSIDY_SWEEP_STEP` 0.05 and `SUBSIDY_GAP_LIMIT_GROSS` 0.01 (D20, C02). Decision ids D18 to D23 follow `CARBON_AND_SUBSIDY.md` section 1; they enter `docs/ABATEMENT_SUBSIDY_LOG.md` in milestone 4. The corrected `DISCOUNT` locator (p8) is recorded in derivation 03, not in the legacy row.
+- `engine/props/src/units.rs`: `KCAL_KJ` = 4.1868.
+- `engine/plant/src/refplant.rs` (new): registry reader, N.R.1 to N.R.12 and the plant heat register N.R.15, 16 checks of which 6 block the model build (carbon gas to stack 0.2 %, PSA species 0.5 kmol/h, stack CO2 against 0.8091 at 0.1 %, net power 1e-9, PSA mass 1 kg/h, gas split 1 kg/h; tolerances labelled assumed with their rounding bands, C12). `psa_tail` and `supp_ng_t_h` are documented test only (C09). The CO2-wash bound is A1 (C08). The recovery check reads the printed 85 to 90 % to the whole percent (below 90.5 %, C11). Derived rows I16 to I18 are labelled derived and unpublished.
+- `engine/plant/src/anchored.rs`: `Model.refp` is built (and its blocking checks run) in `Model::build`; no result reads it while `REF_BASIS` is 0. `params.rs`: `Reader::band`. `subsidy.rs`: `sweep_step` and `gap_limit_gross` read and range-checked, used by no table yet.
+- `engine/plant/tests/m12_reference_plant.rs` (new): 17 tests, expected values worked from the printed tables. `no_internal_pointers.rs`: `PUBLIC_MD` gains `docs/derivation/03_reference_plant.md`.
+- `docs/derivation/03_reference_plant.md` (new): Reference Frame and N.R.1 to N.R.12 and N.R.15 with substitutions; N.R.13, N.R.14, N.R.16 and N.R.17 listed for the integration step. The full derivation, the SymPy script and the PDF belong to milestone 8.
+
+Key reconstructed values (engine, published scale): PSA recovery 0.900058; largest PSA species residual 0.347 kmol/h; tail-gas LHV 101.950 MW; fired duty 157.905 MW (tail-gas share 64.56 %); stack CO2 80.9067 t/h, carbon residual -0.085 %; intensity 8.995625 kg/kg and 0.809066 kg/Nm3 (Table 2: 0.8091, -4.1e-5); CO2 from the tail gas A = 0.69438 kg/Nm3 (85.8 %), CO2-wash bound A1 = 0.47209 kg/Nm3; gas 394.772 MW LHV, 34.2776 MMSCFD by energy (34.2548 at Case B, x = 0.999333); net power 9.918 MWe; revenue check 6,603,007.68 against 6,603,008 EUR/y.
+
+### Mutation set (WP1)
+
+Ten mutations of `refplant.rs`, each restored by copying the file back: 10 of 10 caught by `m12_reference_plant` (recovery without the recycle, CO heating value, rho without B2, intensity on product plus recycle, net power without auxiliaries, scale on 8,988 kg/h, thermochemical calorie, burner duty sign, gas by a fixed 1,050.75 Btu/scf, tail-gas combustion added again). Three of them are refused by a blocking check at model build. Lesson recorded: restoring a file by copy keeps its old modification time, so cargo kept the last mutated test binary and the first gate run (run1) failed 19 tests on a stale build; the file was touched and the gate rerun (run2) on the same commit passed. The committed file never held a mutation (checked with `git show`).
+
+### Gates on `1170c74` (2026-11-24, one script, sequential, `CARGO_BUILD_JOBS=2`, `--test-threads=2`, Rust 1.96.0 from `rust-toolchain.toml`, Windows `x86_64-pc-windows-gnu`)
+
+| Step | Command | Result | Time |
+|---|---|---|---|
+| text guard | `python -I scripts/check_clean.py` | 278 files, 0 hits | 3 s |
+| G6 format, lint | `cargo fmt --all --check`; `cargo clippy --workspace --all-targets -- -D warnings` | ok; ok | 1 s; 6 s |
+| G6 tests (dev) | `cargo test --workspace -- --test-threads=2` | 497 passed, 0 failed, 0 ignored (36 result lines; 480 before plus 17 new) | 233 s |
+| WP1 tests | `cargo test -p nush2_plant --test m12_reference_plant` | 17 passed | 1 s |
+| G0 | `engine/vv/data/pre_reference_results/` | present, 8 tables | |
+| G2 | legacy export, `compare_results.py ... --subset` as in `ci.yml` | PASS within tolerance (not byte-identical, as at milestone 1: Economic_Ledger 12, Integrated_Mass_Balance 70, Sensitivity_Results 3, Validation_Results 25 cells unequal as text); `Final_Design_Basis.csv` 170 rows only in the regenerated table (40 before, plus the 130 new entries) | 50 s |
+| same-machine regression | default and legacy exports of `1170c74` against the exports of the base commit `9f7524f` (built in a detached worktree outside the repository) | every table **byte-identical** except `Final_Design_Basis.csv` (130 added rows, no existing row changed) and `Validation_Results.csv` (only the `PARAMS_COMPLETE` conditions cell, "271 entries" to "401 entries"), on both bases | |
+| G3 form | `compare_results.py engine/vv/data/pre_reference_results <default export> --subset` with the two allowed `conditions` cells | **FAIL**, 12 cells, all F1 (`FS_B_REC_F_T800`); 130 new rows counted | |
+| G0 regression | `compare_results.py engine/vv/data/pre_reference_results <default export>` (positional) | **FAIL**: F1 cells, plus the 130 new `Final_Design_Basis.csv` rows and the `PARAMS_COMPLETE` count, by design until regeneration (C03) | |
+| G5 | `compare_results.py results <default export>` | **FAIL**, the same as the G0 regression (54 listed differences). In the subset form only the 12 F1 cells remain | |
+| G4 | balance tables, bytes | energy balance identical to `results/`, the snapshot and the base commit; mass balance identical to the base-commit export on both bases and different from `results/` in the 12 F1 cells, as at milestone 1 | |
+| G1 | `cargo test --workspace eq_s_9b eq_s_8` | 7 passed | 4 s |
+| G1, numbers | `build_numbers.py`; `--self-test` | **FAIL** (F2), unchanged; self-test 11 PASS then exit 1 | |
+| Rust text guard | `cargo test -p nush2_plant --test no_internal_pointers` | 2 passed | 1 s |
+| SymPy | `sympy_carbon.py`; `sympy_subsidy.py` | **108 of 115**; **118 of 120** (C19, C15b) (F3), unchanged | 2 s each |
+| release tests | `cargo test --workspace --release -- --test-threads=2` | 497 passed, 0 failed | 289 s |
+| wasm | `build_wasm.py`; `check_wasm.py` | 1,205,283 bytes (was 1,127,673: the model now builds the reference), 0 imports, PASS | 21 s |
+| G6 site | `build_site.py ...`; `check_site.py`; `--prove` | ok (34 files); PASS (34 site, 272 repository files, 0 hits); proof 34 of 34 and 11 of 11 | 7 s |
+| G6 browser self-test | `selftest.py` with Edge at 1440 x 900, 1440 x 900 reduced motion, 375 x 812 mobile, 1024 x 600, 1024 x 768 | **FAIL** at every viewport by `headline_parity` only (F4, the same two values as at milestone 1); `pfd_streams_bound` skipped by design; 0 console errors, 31 requests, 0 to another host | about 55 s each |
+
+No tolerance, golden file, snapshot or results table was changed. The CI run that the push of this record starts on pull request 4 is read and reported with the push; it is carried into this file with the records of milestone 3, so that recording it does not start another run.
+
+### Open items handed to milestone 3
+
+- Integration (WP3): `baseline_kg_kg(Ieaghg)` as the one accessor (C04), the system lines N.R.13 and N.R.14, the decomposition N.R.16, the G3 test with `REF_BASIS = 0` (N.R.17), and the scenario-exclusivity part of N.R.15 (no anchored scenario uses both the burn-on-site term and the recycle claim of S14).
+- WP4: `Reference_Plant.csv`, the 14 validation rows (the reconstruction already computes all of them except `REF_LCOH_BRIDGE` and `IND_FLOOR_VS_IEAGHG`), the CSV count of nine, `--ref-basis`.
+- F1 decision (which platform's T800 cells are authoritative) when the tables are regenerated.
+
 ## Test and verification results
 
 See milestone sections.
@@ -180,12 +235,12 @@ D14 (cryogenic f and r, no source), D15 (shipping distance and unverified coordi
 
 ## Blockers
 
-None blocking milestone 2. Candidate: no sourced Singapore electricity export price; unverified site coordinates.
+None blocking milestone 3. Candidate: no sourced Singapore electricity export price; unverified site coordinates.
 
 ## Next actions
 
-1. Milestone 2: WP0 of `ENGINE_REFERENCE_PLANT.md` (registry entries, `refplant.rs` structs and reader; nothing numerical may change).
-2. Re-derive every IEAGHG value from the report PDF with its page: the two files in `reference/` contain 214 `<working folder>` substitutions (175 in the specification, 39 in the critique), each of which also removed the character before a colon, so any value next to one is unreadable.
+1. Milestone 3: WP3 and WP4 of `ENGINE_REFERENCE_PLANT.md` up to regeneration (see "Open items handed to milestone 3").
+2. Keep re-deriving IEAGHG values from the report PDF with its page: the two files in `reference/` contain 214 `<working folder>` substitutions (175 in the specification, 39 in the critique), each of which also removed the character before a colon, so any value next to one is unreadable. Milestone 2 re-read every value it uses (section "Milestone 2").
 3. Open findings F1 to F4 of milestone 1 (above). F1: CI on pull request 4 shows that neither Linux nor Windows reproduces the committed T800 cells; decide in milestone 3 how the run is made reproducible, without loosening the tolerance. F2 and F3 in milestones 4 and 5, F4 in milestone 7. Rerun the milestone-1 gates once they are closed and record them; milestone 1 stays partial until then.
 
 ## Update 2026-11-10
