@@ -9,6 +9,7 @@
 use crate::abatement::CarbonParams;
 use crate::heatrec;
 use crate::params::{ParamSet, Reader};
+use crate::refplant::{RefPlant, RefPlantParams};
 use crate::subsidy::SubsidyParams;
 use crate::utility::{self, ReactorTerms};
 use nush2_numerics::{fixed_point, EngineError, Result};
@@ -327,6 +328,10 @@ pub struct Model {
     pub subsidy: SubsidyParams,
     /// Inputs of the independent carbon basis (`crate::abatement`).
     pub carbon_params: CarbonParams,
+    /// IEAGHG 2017-02 Base Case reference plant (`crate::refplant`), checked
+    /// against the printed tables when the model is built. No result reads it
+    /// while `REF_BASIS` is 0.
+    pub refp: RefPlant,
 }
 
 /// Inputs of the independent WGS-EX4 cooling curve check.
@@ -904,6 +909,7 @@ impl Model {
             scale_t08: r.term_scale("T08"),
             subsidy: SubsidyParams::read(r)?,
             carbon_params: CarbonParams::read(r)?,
+            refp: RefPlant::new(RefPlantParams::read(r)?)?,
         })
     }
 

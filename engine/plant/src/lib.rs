@@ -16,6 +16,7 @@ pub mod flowsheet;
 pub mod gates;
 pub mod heatrec;
 pub mod params;
+pub mod refplant;
 pub mod sens;
 pub mod subsidy;
 pub mod terms;

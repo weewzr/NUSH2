@@ -155,6 +155,13 @@ pub struct SubsidyParams {
     /// Largest accepted gap between the two cost methods at a subsidised point,
     /// as a share of the ledger cost.
     pub gap_limit: f64,
+    /// Share step of the definition C sweep (decision D20). Read and checked
+    /// here; no table uses it until definition C is implemented.
+    pub sweep_step: f64,
+    /// Gap limit of definition C against the gross L5 cost (decision D20), a
+    /// separate check beside `gap_limit`, which stays unchanged. Read and checked
+    /// here; no table uses it until definition C is implemented.
+    pub gap_limit_gross: f64,
 }
 
 impl SubsidyParams {
@@ -232,6 +239,21 @@ impl SubsidyParams {
                 format!("{gap_limit} must lie in (0, 1]"),
             ));
         }
+        let sweep_step = r.get("SUBSIDY_SWEEP_STEP")?;
+        let steps = 1.0 / sweep_step;
+        if !(sweep_step > 0.0 && sweep_step <= 1.0 && (steps - steps.round()).abs() < 1e-9) {
+            return Err(range(
+                "SUBSIDY_SWEEP_STEP",
+                format!("{sweep_step} must divide 1 into whole steps"),
+            ));
+        }
+        let gap_limit_gross = r.get("SUBSIDY_GAP_LIMIT_GROSS")?;
+        if !(gap_limit_gross > 0.0 && gap_limit_gross <= 1.0) {
+            return Err(range(
+                "SUBSIDY_GAP_LIMIT_GROSS",
+                format!("{gap_limit_gross} must lie in (0, 1]"),
+            ));
+        }
         Ok(Self {
             grid,
             eligible_a: Eligibility::read(r, "A")?,
@@ -242,6 +264,8 @@ impl SubsidyParams {
             solver_tol,
             residual_tol,
             gap_limit,
+            sweep_step,
+            gap_limit_gross,
         })
     }
 

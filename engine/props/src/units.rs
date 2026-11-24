@@ -39,6 +39,9 @@ pub const MW_H2O: f64 = 18.015;
 pub const R_GAS: f64 = 6.022_140_76e23 * 1.380_649e-23;
 /// Pa per bar.
 pub const BAR_PA: f64 = 1.0e5;
+/// kJ per kcal, the International Table calorie. Converts the MMkcal/h duties of
+/// the IEAGHG 2017-02 equipment list and utility sheet into MW.
+pub const KCAL_KJ: f64 = 4.1868;
 
 /// CO2 flow from st/d to kmol/h.
 pub fn st_d_to_kmol_h(st_d: f64) -> f64 {

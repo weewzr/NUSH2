@@ -294,6 +294,12 @@ impl<'a> Reader<'a> {
         Ok(v)
     }
 
+    /// The (low, high) band of an entry, when both are given. Read the value with
+    /// `get`, which logs the id; the band alone is not a read.
+    pub fn band(&self, id: &str) -> Option<(f64, f64)> {
+        self.set.entries.get(id).and_then(|e| e.low.zip(e.high))
+    }
+
     /// Preset factor on a screening term; not a registry read.
     pub fn term_scale(&self, term: &str) -> f64 {
         self.set.term_scale(term)

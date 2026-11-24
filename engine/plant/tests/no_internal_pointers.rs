@@ -58,13 +58,14 @@ fn working_key(word: &str) -> bool {
 }
 
 /// Markdown files a source string may name: the public docs of the repository.
-const PUBLIC_MD: [&str; 6] = [
+const PUBLIC_MD: [&str; 7] = [
     "docs/final_design_decisions.md",
     "docs/validation_matrix.md",
     "docs/abatement_subsidy_log.md",
     "docs/abatement_subsidy_references.md",
     "docs/derivation/01_carbon_and_abatement.md",
     "docs/derivation/02_cost_and_subsidy.md",
+    "docs/derivation/03_reference_plant.md",
 ];
 
 /// A Markdown or Python file named in a line that is not a public repository
